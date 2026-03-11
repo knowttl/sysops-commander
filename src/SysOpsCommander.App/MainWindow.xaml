@@ -1,0 +1,54 @@
+﻿<Window x:Class="SysOpsCommander.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="{Binding Title}"
+        Height="700"
+        Width="1100"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <!-- Sidebar Navigation -->
+        <Border DockPanel.Dock="Left"
+                Background="#2D2D30"
+                Width="200">
+            <StackPanel Margin="0,10">
+                <Button Content="Dashboard"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="Dashboard"
+                        Margin="5"
+                        Padding="10,8" />
+                <Button Content="AD Explorer"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="ADExplorer"
+                        Margin="5"
+                        Padding="10,8" />
+                <Button Content="Execution"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="Execution"
+                        Margin="5"
+                        Padding="10,8" />
+                <Button Content="Script Library"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="ScriptLibrary"
+                        Margin="5"
+                        Padding="10,8" />
+                <Button Content="Audit Log"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="AuditLog"
+                        Margin="5"
+                        Padding="10,8" />
+                <Button Content="Settings"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="Settings"
+                        Margin="5"
+                        Padding="10,8" />
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content Area -->
+        <ContentControl Content="{Binding CurrentView}"
+                        Margin="10" />
+    </DockPanel>
+</Window>

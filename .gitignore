@@ -1,0 +1,44 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+
+# NuGet
+[Pp]ackages/
+*.nupkg
+*.snupkg
+
+# Test results
+[Tt]est[Rr]esults/
+coverage*.xml
+coverage*.json
+
+# Benchmarks
+BenchmarkDotNet.Artifacts/
+
+# Publish
+publish/
+
+# SQLite runtime databases
+*.db
+*.db-shm
+*.db-wal
+
+# OS / misc
+*.log
+*.zip
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Rider / JetBrains
+.idea/
+*.DotSettings.user
