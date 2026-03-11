@@ -114,9 +114,27 @@ Solution structure, 6 projects, NuGet packages, build configuration (`TreatWarni
 - `InternalsVisibleTo("SysOpsCommander.Tests")` on Services project for `AnalyzeAst` access
 - 86 total tests passing (42 new validation tests)
 
+### Phase 3 — Active Directory Service Layer ✅
+- `IDirectoryAccessor` — thin abstraction over sealed `System.DirectoryServices` types for testability (returns tuples/dictionaries, no DS dependency in Core)
+- `DirectoryAccessor` — production implementation using `DirectoryEntry`, `DirectorySearcher`, `Domain`, `Forest`
+- `AdAttributeMapper` — internal static helpers: SID conversion, GUID conversion, FileTime→ISO 8601 (sentinel 0/MaxValue→"Never"), UAC flag decoding (16 flags), SID→NTAccount resolution
+- `ActiveDirectoryService` — full `IActiveDirectoryService` + `IDisposable` implementation:
+  - Multi-domain: forest enumeration, domain switching with `SemaphoreSlim(1,1)` + `TryBind` validation
+  - Quick search: 5-attribute compound filter with `LdapFilterSanitizer`
+  - Pre-built security filters: locked accounts, disabled computers, stale computers (FileTimeUtc threshold), domain controllers (UAC 8192)
+  - Tree browse (OneLevel scope), object detail with attribute formatting, recursive group membership via `tokenGroups`
+- DI: both `IDirectoryAccessor` and `IActiveDirectoryService` registered as singletons
+- `[SupportedOSPlatform("windows")]` on all AD classes (Services targets `net8.0`, not `net8.0-windows`)
+- 123 total tests passing (37 new AD tests)
+
 ### Known Analyzer Behaviors
 - **IDE0046**: Extremely aggressive — requires ALL cascading `if (...) return X;` before a final return to be folded into nested ternary chains
 - **IDE0007/IDE0008**: `var` only when type is apparent from `new`/factory; explicit type for method returns
 - **IDE0200**: Prefer method group over lambda when possible
 - **IDE0052**: Remove unused private members
 - **IDE0005**: Remove unnecessary usings
+- **IDE0028/IDE0300/IDE0301/IDE0305**: Collection expressions — `new[] { x }` → `[x]`, `Array.Empty<T>()` → `[]`, `.ToList()` → `[.. source]`
+- **IDE0022**: Expression body for single-statement methods/properties
+- **IDE0011**: Braces required on all if/else blocks, even single-line
+- **IDE0042**: Deconstruct tuple variables
+- **CA1416**: `[SupportedOSPlatform("windows")]` required on classes using Windows-only APIs when project targets `net8.0`
