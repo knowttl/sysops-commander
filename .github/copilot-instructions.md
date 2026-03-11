@@ -79,6 +79,14 @@ SysOpsCommander/
 - Keep methods focused — single responsibility
 - All public methods should have corresponding unit tests
 
+## Version Control
+
+- **Git initialized** with conventional commit messages
+- **Commit after each phase** or large set of changes completes successfully (0 warnings, 0 errors, all tests pass)
+- Follow conventional commit format: `type(scope): imperative description`
+- Stage all related files before committing — do not leave partial work uncommitted
+- Verify build + tests pass **before** every commit
+
 ## Testing Conventions
 
 - **Framework**: xUnit with `[Fact]` and `[Theory]`
@@ -87,3 +95,28 @@ SysOpsCommander/
 - **Pattern**: Arrange-Act-Assert (AAA)
 - **Naming**: `MethodName_Scenario_ExpectedBehavior`
 - **Coverage**: Service layer requires full coverage; ViewModels require command + property change coverage
+- **WPF test target**: `net8.0-windows` implicit usings do NOT include `System.IO` — add explicitly when using `Path`, `File`, `Directory`
+
+## Implementation Status
+
+### Phase 0 — Scaffolding ✅
+Solution structure, 6 projects, NuGet packages, build configuration (`TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, `AnalysisLevel=latest-recommended`).
+
+### Phase 1 — Models & Database ✅
+8 enums, 14 models, 12 interfaces, `DatabaseInitializer`, `AuditLogRepository`, `SettingsRepository`, `SettingsService`, DI registrations. 31 tests.
+
+### Phase 2 — Validation Framework ✅
+- `HostnameValidator` — static, `[GeneratedRegex]` for IPv4/NetBIOS/FQDN, injection detection
+- `LdapFilterSanitizer` — RFC 4515 escaping for LDAP filter inputs
+- `ManifestSchemaValidator` — validates `ScriptManifest` schema (required fields, semver, categories, parameters)
+- `ScriptValidationService` — PS script syntax/AST validation, dangerous pattern detection, manifest-pair validation, CredSSP availability check
+- `IScriptValidationService` interface in Core for testability
+- `InternalsVisibleTo("SysOpsCommander.Tests")` on Services project for `AnalyzeAst` access
+- 86 total tests passing (42 new validation tests)
+
+### Known Analyzer Behaviors
+- **IDE0046**: Extremely aggressive — requires ALL cascading `if (...) return X;` before a final return to be folded into nested ternary chains
+- **IDE0007/IDE0008**: `var` only when type is apparent from `new`/factory; explicit type for method returns
+- **IDE0200**: Prefer method group over lambda when possible
+- **IDE0052**: Remove unused private members
+- **IDE0005**: Remove unnecessary usings
