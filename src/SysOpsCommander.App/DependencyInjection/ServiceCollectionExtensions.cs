@@ -25,6 +25,8 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<IHostTargetingService, HostTargetingService>();
         _ = services.AddSingleton<ISettingsService, SettingsService>();
         _ = services.AddSingleton<IScriptValidationService, ScriptValidationService>();
+        _ = services.AddSingleton<IDirectoryAccessor, DirectoryAccessor>();
+        _ = services.AddSingleton<IActiveDirectoryService, ActiveDirectoryService>();
 
         return services;
     }
