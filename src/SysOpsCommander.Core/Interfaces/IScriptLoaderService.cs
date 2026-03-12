@@ -28,4 +28,9 @@ public interface IScriptLoaderService
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task RefreshAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Raised when the script library changes after a refresh (scripts added, removed, or modified).
+    /// </summary>
+    event EventHandler<ScriptLibraryChangedEventArgs>? LibraryChanged;
 }

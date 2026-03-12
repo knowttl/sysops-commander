@@ -1,0 +1,10 @@
+{
+    "name": "Test-WinRMConnectivity",
+    "description": "Verifies WinRM is running and returns basic system info as JSON.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Diagnostics",
+    "dangerLevel": "Safe",
+    "outputFormat": "Json",
+    "parameters": []
+}

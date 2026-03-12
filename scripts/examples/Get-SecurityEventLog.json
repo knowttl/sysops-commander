@@ -1,0 +1,25 @@
+{
+    "name": "Get-SecurityEventLog",
+    "description": "Retrieves recent Security event log entries. Optionally filter by Event ID.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Security",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": [
+        {
+            "name": "MaxEvents",
+            "type": "int",
+            "description": "Maximum number of events to retrieve",
+            "required": false,
+            "defaultValue": "100"
+        },
+        {
+            "name": "EventId",
+            "type": "string",
+            "description": "Filter by specific Event ID (e.g., 4624 for logon events)",
+            "required": false,
+            "defaultValue": ""
+        }
+    ]
+}

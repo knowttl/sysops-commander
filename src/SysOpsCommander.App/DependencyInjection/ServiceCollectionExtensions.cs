@@ -4,6 +4,7 @@ using Serilog;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 using SysOpsCommander.Infrastructure.Database;
+using SysOpsCommander.Infrastructure.FileSystem;
 using SysOpsCommander.Services;
 using SysOpsCommander.Services.Strategies;
 using SysOpsCommander.ViewModels;
@@ -36,6 +37,8 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<ICredentialService, CredentialService>();
         _ = services.AddSingleton<INotificationService, NotificationService>();
         _ = services.AddSingleton<IAuditLogService, AuditLogService>();
+        _ = services.AddSingleton<IScriptLoaderService, ScriptLoaderService>();
+        _ = services.AddSingleton<IExportService, ExportService>();
 
         return services;
     }
@@ -72,6 +75,7 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<DatabaseInitializer>();
         _ = services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
         _ = services.AddSingleton<ISettingsRepository, SettingsRepository>();
+        _ = services.AddSingleton<IScriptFileProvider, ScriptFileProvider>();
         _ = services.AddSingleton(Log.Logger);
 
         return services;

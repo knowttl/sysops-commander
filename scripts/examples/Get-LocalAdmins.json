@@ -1,0 +1,10 @@
+{
+    "name": "Get-LocalAdmins",
+    "description": "Lists members of the local Administrators group.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Security",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": []
+}

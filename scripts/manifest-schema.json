@@ -1,0 +1,83 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SysOps Commander Script Manifest",
+    "description": "Schema for script manifest files that accompany PowerShell scripts in SysOps Commander.",
+    "type": "object",
+    "required": ["name", "description", "version", "author", "category", "dangerLevel", "outputFormat", "parameters"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the script."
+        },
+        "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Brief description of what the script does."
+        },
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "Semantic version (e.g., 1.0.0)."
+        },
+        "author": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Author or team that created the script."
+        },
+        "category": {
+            "type": "string",
+            "enum": ["Security", "Inventory", "Diagnostics", "Configuration", "Maintenance", "Compliance", "Networking", "UserManagement"],
+            "description": "Functional category for grouping scripts."
+        },
+        "dangerLevel": {
+            "type": "string",
+            "enum": ["Safe", "Low", "Medium", "High", "Critical"],
+            "description": "Risk level of the script. Higher levels require additional confirmation."
+        },
+        "outputFormat": {
+            "type": "string",
+            "enum": ["Text", "Table", "Json"],
+            "description": "Rendering hint for the script output display."
+        },
+        "parameters": {
+            "type": "array",
+            "description": "List of parameters the script accepts.",
+            "items": {
+                "type": "object",
+                "required": ["name", "type", "description", "required"],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Parameter name (must match the PowerShell param name)."
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["string", "int", "bool", "string[]"],
+                        "description": "Data type of the parameter."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the parameter."
+                    },
+                    "required": {
+                        "type": "boolean",
+                        "description": "Whether the parameter is mandatory."
+                    },
+                    "defaultValue": {
+                        "type": "string",
+                        "description": "Default value if the parameter is not provided."
+                    },
+                    "validValues": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Optional list of allowed values for the parameter."
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false
+}
