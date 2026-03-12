@@ -9,11 +9,23 @@
         Height="700"
         Width="1100"
         WindowStartupLocation="CenterScreen"
-        ExtendsContentIntoTitleBar="True">
+        ExtendsContentIntoTitleBar="True"
+        AutomationProperties.Name="SysOps Commander Main Window">
+
+    <!-- Keyboard Shortcuts -->
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Key="F" Modifiers="Control" Command="{Binding FocusSearchCommand}" />
+        <KeyBinding Key="E" Modifiers="Control" Command="{Binding NavigateToExecutionCommand}" />
+        <KeyBinding Key="D" Modifiers="Control" Command="{Binding OpenDomainSelectorCommand}" />
+        <KeyBinding Key="F5" Command="{Binding RefreshCurrentViewCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding CancelCurrentOperationCommand}" />
+    </ui:FluentWindow.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Custom TitleBar -->
@@ -43,7 +55,8 @@
                                 CommandParameter="Dashboard"
                                 HorizontalContentAlignment="Left"
                                 Margin="0,2"
-                                Padding="12,10">
+                                Padding="12,10"
+                                AutomationProperties.Name="Navigate to Dashboard">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="Home24" Margin="0,0,12,0" />
                                 <TextBlock Text="Dashboard" VerticalAlignment="Center" />
@@ -53,7 +66,8 @@
                                 CommandParameter="ADExplorer"
                                 HorizontalContentAlignment="Left"
                                 Margin="0,2"
-                                Padding="12,10">
+                                Padding="12,10"
+                                AutomationProperties.Name="Navigate to AD Explorer">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="PeopleTeam24" Margin="0,0,12,0" />
                                 <TextBlock Text="AD Explorer" VerticalAlignment="Center" />
@@ -63,7 +77,8 @@
                                 CommandParameter="Execution"
                                 HorizontalContentAlignment="Left"
                                 Margin="0,2"
-                                Padding="12,10">
+                                Padding="12,10"
+                                AutomationProperties.Name="Navigate to Execution">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="Play24" Margin="0,0,12,0" />
                                 <TextBlock Text="Execution" VerticalAlignment="Center" />
@@ -73,7 +88,8 @@
                                 CommandParameter="ScriptLibrary"
                                 HorizontalContentAlignment="Left"
                                 Margin="0,2"
-                                Padding="12,10">
+                                Padding="12,10"
+                                AutomationProperties.Name="Navigate to Script Library">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="Code24" Margin="0,0,12,0" />
                                 <TextBlock Text="Script Library" VerticalAlignment="Center" />
@@ -83,7 +99,8 @@
                                 CommandParameter="AuditLog"
                                 HorizontalContentAlignment="Left"
                                 Margin="0,2"
-                                Padding="12,10">
+                                Padding="12,10"
+                                AutomationProperties.Name="Navigate to Audit Log">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="ClipboardTextLtr24" Margin="0,0,12,0" />
                                 <TextBlock Text="Audit Log" VerticalAlignment="Center" />
@@ -98,7 +115,8 @@
                                 CommandParameter="Settings"
                                 HorizontalContentAlignment="Left"
                                 Margin="0,2"
-                                Padding="12,10">
+                                Padding="12,10"
+                                AutomationProperties.Name="Navigate to Settings">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="Settings24" Margin="0,0,12,0" />
                                 <TextBlock Text="Settings" VerticalAlignment="Center" />
@@ -123,6 +141,55 @@
                     <ContentControl Content="{Binding CurrentView}" />
                 </Grid>
             </Border>
+
+            <!-- Loading Overlay -->
+            <Grid Grid.Column="0" Grid.ColumnSpan="2"
+                  Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                  Background="#80000000" Panel.ZIndex="100">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="200" Height="8" />
+                    <TextBlock Text="{Binding BusyMessage}" Foreground="White"
+                               HorizontalAlignment="Center" Margin="0,8,0,0" />
+                </StackPanel>
+            </Grid>
         </Grid>
+
+        <!-- Status Bar -->
+        <StatusBar Grid.Row="2"
+                   Background="{DynamicResource ControlFillColorDefaultBrush}"
+                   AutomationProperties.Name="Application Status Bar">
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Domain:" Margin="0,0,4,0" />
+                    <ComboBox ItemsSource="{Binding AvailableDomains}"
+                              SelectedItem="{Binding SelectedDomain}"
+                              DisplayMemberPath="DomainName"
+                              MinWidth="160"
+                              AutomationProperties.Name="Domain Selector" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Symbol="Person24" Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding CurrentUserName}" AutomationProperties.Name="Current User" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10"
+                             Fill="{Binding ConnectionStatus, Converter={StaticResource StatusToColorConverter}}"
+                             Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding ConnectionStatus}" AutomationProperties.Name="Connection Status" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem HorizontalAlignment="Right"
+                           Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="⬆ Update Available" Foreground="DodgerBlue" Cursor="Hand"
+                           AutomationProperties.Name="Update Available" />
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </ui:FluentWindow>

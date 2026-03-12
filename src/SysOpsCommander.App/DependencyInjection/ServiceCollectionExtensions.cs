@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using SysOpsCommander.App.Services;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 using SysOpsCommander.Infrastructure.Database;
@@ -8,6 +9,7 @@ using SysOpsCommander.Infrastructure.FileSystem;
 using SysOpsCommander.Services;
 using SysOpsCommander.Services.Strategies;
 using SysOpsCommander.ViewModels;
+using SysOpsCommander.ViewModels.Dialogs;
 
 namespace SysOpsCommander.App.DependencyInjection;
 
@@ -40,6 +42,8 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<IScriptLoaderService, ScriptLoaderService>();
         _ = services.AddSingleton<IExportService, ExportService>();
 
+        _ = services.AddSingleton<IDialogService, DialogService>();
+
         return services;
     }
 
@@ -53,6 +57,13 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         _ = services.AddTransient<MainWindowViewModel>();
+        _ = services.AddTransient<DashboardViewModel>();
+        _ = services.AddTransient<AdExplorerViewModel>();
+        _ = services.AddTransient<ExecutionViewModel>();
+        _ = services.AddTransient<ScriptLibraryViewModel>();
+        _ = services.AddTransient<AuditLogViewModel>();
+        _ = services.AddTransient<SettingsViewModel>();
+        _ = services.AddTransient<DomainSelectorViewModel>();
 
         return services;
     }

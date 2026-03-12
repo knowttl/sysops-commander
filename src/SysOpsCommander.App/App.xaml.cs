@@ -60,6 +60,9 @@ public partial class App : Application
         // Apply Mica backdrop and watch for system theme changes
         ApplicationThemeManager.Apply(mainWindow);
         SystemThemeWatcher.Watch(mainWindow);
+
+        // Initialize ViewModel after window is shown to avoid blocking startup
+        _ = viewModel.InitializeAsync();
     }
 
     /// <inheritdoc/>
