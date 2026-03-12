@@ -1,10 +1,460 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Serilog;
+using SysOpsCommander.Core.Constants;
+using SysOpsCommander.Core.Interfaces;
+using SysOpsCommander.Core.Models;
 
 namespace SysOpsCommander.ViewModels;
 
 /// <summary>
-/// ViewModel for the Active Directory Explorer view. Provides tree browse, search, and object detail.
+/// ViewModel for the Active Directory Explorer view. Provides tree browse, search, object detail,
+/// pre-built security filters, and integration with the execution target list.
 /// </summary>
-public partial class AdExplorerViewModel : ObservableObject
+public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisposable
 {
+    private readonly IActiveDirectoryService _adService;
+    private readonly IHostTargetingService _hostTargetingService;
+    private readonly ISettingsService _settingsService;
+    private readonly IDialogService _dialogService;
+    private readonly ILogger _logger;
+    private CancellationTokenSource? _searchDebounceTimer;
+    private readonly CancellationTokenSource _cts = new();
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private string _activeDomainDisplay = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<AdTreeNode> _treeNodes = [];
+
+    [ObservableProperty]
+    private ObservableCollection<AdObject> _searchResults = [];
+
+    [ObservableProperty]
+    private AdObject? _selectedObject;
+
+    [ObservableProperty]
+    private ObservableCollection<KeyValuePair<string, string>> _selectedObjectAttributes = [];
+
+    [ObservableProperty]
+    private ObservableCollection<string> _selectedObjectGroups = [];
+
+    [ObservableProperty]
+    private bool _isSearching;
+
+    [ObservableProperty]
+    private int _staleThresholdDays = AppConstants.DefaultStaleComputerDays;
+
+    [ObservableProperty]
+    private string _resultStatus = string.Empty;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AdExplorerViewModel"/> class.
+    /// </summary>
+    /// <param name="adService">The Active Directory service.</param>
+    /// <param name="hostTargetingService">The shared host targeting service.</param>
+    /// <param name="settingsService">The settings service for configurable thresholds.</param>
+    /// <param name="dialogService">The dialog service for user notifications.</param>
+    /// <param name="logger">The Serilog logger.</param>
+    public AdExplorerViewModel(
+        IActiveDirectoryService adService,
+        IHostTargetingService hostTargetingService,
+        ISettingsService settingsService,
+        IDialogService dialogService,
+        ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(adService);
+        ArgumentNullException.ThrowIfNull(hostTargetingService);
+        ArgumentNullException.ThrowIfNull(settingsService);
+        ArgumentNullException.ThrowIfNull(dialogService);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        _adService = adService;
+        _hostTargetingService = hostTargetingService;
+        _settingsService = settingsService;
+        _dialogService = dialogService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Refreshes the tree root and active domain display.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public Task RefreshAsync() => LoadTreeRootAsync();
+
+    /// <summary>
+    /// Loads the tree root from the active domain.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task LoadTreeRootAsync()
+    {
+        try
+        {
+            DomainConnection domain = _adService.GetActiveDomain();
+            ActiveDomainDisplay = domain.DomainName;
+
+            IReadOnlyList<AdObject> rootChildren = await _adService.BrowseChildrenAsync(
+                domain.RootDistinguishedName, _cts.Token).ConfigureAwait(false);
+
+            TreeNodes.Clear();
+            foreach (AdObject child in rootChildren)
+            {
+                AdTreeNode node = MapToTreeNode(child);
+                node.HasDummyChild = true;
+                TreeNodes.Add(node);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled — no action needed
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to load AD tree root");
+            ResultStatus = $"Failed to load tree: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Expands a tree node by lazy-loading its children from AD.
+    /// </summary>
+    /// <param name="node">The tree node to expand.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task ExpandNodeAsync(AdTreeNode? node)
+    {
+        if (node is null || !node.HasDummyChild)
+        {
+            return;
+        }
+
+        node.HasDummyChild = false;
+        node.Children.Clear();
+
+        try
+        {
+            IReadOnlyList<AdObject> children = await _adService.BrowseChildrenAsync(
+                node.DistinguishedName, _cts.Token).ConfigureAwait(false);
+
+            foreach (AdObject child in children)
+            {
+                AdTreeNode childNode = MapToTreeNode(child);
+                node.Children.Add(childNode);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled — no action needed
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to expand tree node {DN}", node.DistinguishedName);
+        }
+    }
+
+    /// <summary>
+    /// Searches Active Directory for objects matching the current search text.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            return;
+        }
+
+        IsSearching = true;
+        ResultStatus = "Searching...";
+
+        try
+        {
+            AdSearchResult result = await _adService.SearchAsync(SearchText, _cts.Token).ConfigureAwait(false);
+            SearchResults.Clear();
+            foreach (AdObject obj in result.Results)
+            {
+                SearchResults.Add(obj);
+            }
+
+            ResultStatus = $"{result.TotalResultCount} results found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
+        }
+        catch (OperationCanceledException)
+        {
+            ResultStatus = "Search cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "AD search failed for term: {SearchTerm}", SearchText);
+            ResultStatus = $"Search failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>
+    /// Gets currently locked-out user accounts.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task GetLockedAccountsAsync()
+    {
+        await ExecuteSecurityFilterAsync(
+            _adService.GetLockedAccountsAsync,
+            "Locked Accounts").ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets disabled computer accounts.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task GetDisabledComputersAsync()
+    {
+        await ExecuteSecurityFilterAsync(
+            _adService.GetDisabledComputersAsync,
+            "Disabled Computers").ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets stale computer accounts based on the configurable threshold.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task GetStaleComputersAsync()
+    {
+        try
+        {
+            StaleThresholdDays = await _settingsService.GetTypedAsync(
+                "StaleComputerThresholdDays",
+                AppConstants.DefaultStaleComputerDays,
+                _cts.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to load stale threshold setting, using default");
+            StaleThresholdDays = AppConstants.DefaultStaleComputerDays;
+        }
+
+        await ExecuteSecurityFilterAsync(
+            ct => _adService.GetStaleComputersAsync(StaleThresholdDays, ct),
+            $"Stale Computers ({StaleThresholdDays} days)").ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets all domain controllers in the active domain.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    [RelayCommand]
+    private async Task GetDomainControllersAsync()
+    {
+        IsSearching = true;
+        ResultStatus = "Loading domain controllers...";
+
+        try
+        {
+            IReadOnlyList<string> dcs = await _adService.GetDomainControllersAsync(_cts.Token).ConfigureAwait(false);
+            SearchResults.Clear();
+            foreach (string dc in dcs)
+            {
+                SearchResults.Add(new AdObject
+                {
+                    Name = dc,
+                    DistinguishedName = dc,
+                    ObjectClass = "computer",
+                    DisplayName = dc
+                });
+            }
+
+            ResultStatus = $"{dcs.Count} domain controllers found";
+        }
+        catch (OperationCanceledException)
+        {
+            ResultStatus = "Operation cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to load domain controllers");
+            ResultStatus = $"Failed to load domain controllers: {ex.Message}";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>
+    /// Sends computer objects from the search results to the execution target list.
+    /// </summary>
+    [RelayCommand]
+    private void SendToExecutionTargets()
+    {
+        var computers = SearchResults
+            .Where(o => o.ObjectClass.Equals("computer", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (computers.Count == 0)
+        {
+            _dialogService.ShowInfo("No Computers", "No computer objects are available to send.");
+            return;
+        }
+
+        _hostTargetingService.AddFromAdSearchResults(computers);
+        ResultStatus = $"Sent {computers.Count} computers to Execution Targets.";
+        _logger.Information("Sent {Count} AD computers to execution targets", computers.Count);
+    }
+
+    partial void OnSelectedObjectChanged(AdObject? value)
+    {
+        if (value is not null)
+        {
+            _ = LoadObjectDetailAsync(value.DistinguishedName);
+        }
+        else
+        {
+            SelectedObjectAttributes.Clear();
+            SelectedObjectGroups.Clear();
+        }
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        _searchDebounceTimer?.Cancel();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        _searchDebounceTimer = new CancellationTokenSource();
+        CancellationToken token = _searchDebounceTimer.Token;
+
+        _ = Task.Delay(300, token).ContinueWith(
+            _ => SearchCommand.Execute(null),
+            token,
+            TaskContinuationOptions.OnlyOnRanToCompletion,
+            TaskScheduler.Default);
+    }
+
+    private async Task LoadObjectDetailAsync(string dn)
+    {
+        try
+        {
+            AdObject detail = await _adService.GetObjectDetailAsync(dn, _cts.Token).ConfigureAwait(false);
+            SelectedObjectAttributes.Clear();
+            foreach (KeyValuePair<string, string> attr in detail.Attributes
+                         .OrderBy(a => a.Key)
+                         .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)))
+            {
+                SelectedObjectAttributes.Add(attr);
+            }
+
+            IReadOnlyList<string> groups = await _adService.GetGroupMembershipAsync(
+                dn, recursive: true, _cts.Token).ConfigureAwait(false);
+
+            SelectedObjectGroups.Clear();
+            foreach (string group in groups)
+            {
+                SelectedObjectGroups.Add(group);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled — no action needed
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to load detail for {DN}", dn);
+        }
+    }
+
+    private async Task ExecuteSecurityFilterAsync(
+        Func<CancellationToken, Task<AdSearchResult>> filterFunc,
+        string filterName)
+    {
+        IsSearching = true;
+        ResultStatus = $"Loading {filterName}...";
+
+        try
+        {
+            AdSearchResult result = await filterFunc(_cts.Token).ConfigureAwait(false);
+            SearchResults.Clear();
+            foreach (AdObject obj in result.Results)
+            {
+                SearchResults.Add(obj);
+            }
+
+            ResultStatus = $"{result.TotalResultCount} {filterName} found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
+        }
+        catch (OperationCanceledException)
+        {
+            ResultStatus = "Operation cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to load {FilterName}", filterName);
+            ResultStatus = $"Failed to load {filterName}: {ex.Message}";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    private static AdTreeNode MapToTreeNode(AdObject adObject) =>
+        new()
+        {
+            Name = adObject.Name,
+            DistinguishedName = adObject.DistinguishedName,
+            ObjectClass = adObject.ObjectClass,
+            HasDummyChild = true
+        };
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _searchDebounceTimer?.Dispose();
+        _cts.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}
+
+/// <summary>
+/// Represents a node in the Active Directory tree view with lazy-loading support.
+/// </summary>
+public partial class AdTreeNode : ObservableObject
+{
+    /// <summary>
+    /// Gets the display name of the tree node.
+    /// </summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the full distinguished name of the AD object.
+    /// </summary>
+    public string DistinguishedName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the AD object class (e.g., "organizationalUnit", "container").
+    /// </summary>
+    public string ObjectClass { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the child nodes of this tree node.
+    /// </summary>
+    public ObservableCollection<AdTreeNode> Children { get; } = [];
+
+    [ObservableProperty]
+    private bool _isExpanded;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this node has a dummy child for lazy-load expand arrow display.
+    /// </summary>
+    public bool HasDummyChild { get; set; } = true;
 }

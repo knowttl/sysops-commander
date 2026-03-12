@@ -3,11 +3,215 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
+             d:DesignHeight="650" d:DesignWidth="1000"
+             d:DataContext="{d:DesignInstance Type=vm:AdExplorerViewModel}"
              AutomationProperties.Name="AD Explorer View">
     <Grid>
-        <TextBlock Text="AD Explorer — Coming in Phase 7"
-                   Style="{StaticResource PlaceholderTextStyle}" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: Domain Badge + Search -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="AD Explorer"
+                           Style="{StaticResource SectionHeaderStyle}" />
+                <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        Padding="8,4" Margin="12,0,0,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Active Domain Badge">
+                    <TextBlock Text="{Binding ActiveDomainDisplay}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                </Border>
+            </StackPanel>
+
+            <Grid Grid.Column="1" Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="AD Search Box" />
+                <Button Grid.Column="1"
+                        Content="Search"
+                        Command="{Binding SearchCommand}"
+                        Margin="4,0,0,0"
+                        AutomationProperties.Name="Search Button" />
+            </Grid>
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button Content="Send to Targets"
+                        Command="{Binding SendToExecutionTargetsCommand}"
+                        AutomationProperties.Name="Send to Execution Targets" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Security Filter Buttons -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Security Filters:" VerticalAlignment="Center" Margin="0,0,8,0"
+                       FontWeight="SemiBold" />
+            <Button Content="Locked Accounts"
+                    Command="{Binding GetLockedAccountsCommand}"
+                    Margin="0,0,4,0"
+                    AutomationProperties.Name="Get Locked Accounts" />
+            <Button Content="Disabled Computers"
+                    Command="{Binding GetDisabledComputersCommand}"
+                    Margin="0,0,4,0"
+                    AutomationProperties.Name="Get Disabled Computers" />
+            <Button Content="Stale Computers"
+                    Command="{Binding GetStaleComputersCommand}"
+                    Margin="0,0,4,0"
+                    AutomationProperties.Name="Get Stale Computers" />
+            <Button Content="Domain Controllers"
+                    Command="{Binding GetDomainControllersCommand}"
+                    AutomationProperties.Name="Get Domain Controllers" />
+        </StackPanel>
+
+        <!-- Main 3-panel layout -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250" MinWidth="150" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="300" MinWidth="200" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Tree View -->
+            <Border Grid.Column="0"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Button Grid.Row="0" Content="Load Tree"
+                            Command="{Binding LoadTreeRootCommand}"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"
+                            AutomationProperties.Name="Load AD Tree" />
+                    <TreeView Grid.Row="1"
+                              ItemsSource="{Binding TreeNodes}"
+                              AutomationProperties.Name="AD Object Tree"
+                              x:Name="AdTreeView">
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <TextBlock Text="{Binding Name}" />
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="4"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent" />
+
+            <!-- Center: Search Results -->
+            <Border Grid.Column="2"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Search Results"
+                               FontWeight="SemiBold" Margin="4,0,0,4" />
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding SearchResults}"
+                              SelectedItem="{Binding SelectedObject}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              CanUserSortColumns="True"
+                              AutomationProperties.Name="AD Search Results">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                            <DataGridTextColumn Header="Class" Binding="{Binding ObjectClass}" Width="100" />
+                            <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName}" Width="*" />
+                            <DataGridTextColumn Header="Distinguished Name" Binding="{Binding DistinguishedName}" Width="2*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <ProgressBar Grid.Row="1"
+                                 IsIndeterminate="True"
+                                 Height="4"
+                                 VerticalAlignment="Top"
+                                 Visibility="{Binding IsSearching, Converter={StaticResource BoolToVisibilityConverter}}" />
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="3" Width="4"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent" />
+
+            <!-- Right: Object Detail Panel -->
+            <Border Grid.Column="4"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="150" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Object Details"
+                               FontWeight="SemiBold" Margin="4,0,0,4" />
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding SelectedObjectAttributes}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              AutomationProperties.Name="Object Attributes">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Attribute" Binding="{Binding Key}" Width="120" />
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Grid.Row="2" Text="Group Membership"
+                               FontWeight="SemiBold" Margin="4,8,0,4" />
+
+                    <ListBox Grid.Row="3"
+                             ItemsSource="{Binding SelectedObjectGroups}"
+                             AutomationProperties.Name="Group Membership List" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status Bar -->
+        <TextBlock Grid.Row="3"
+                   Text="{Binding ResultStatus}"
+                   Margin="0,8,0,0"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   AutomationProperties.Name="Result Status" />
     </Grid>
 </UserControl>

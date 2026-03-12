@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using SysOpsCommander.ViewModels;
 
 namespace SysOpsCommander.App.Views;
 
@@ -13,5 +15,15 @@ public partial class AdExplorerView : UserControl
     public AdExplorerView()
     {
         InitializeComponent();
+        AdTreeView.AddHandler(TreeViewItem.ExpandedEvent, new RoutedEventHandler(OnTreeViewItemExpanded));
+    }
+
+    private void OnTreeViewItemExpanded(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is TreeViewItem { DataContext: AdTreeNode node }
+            && DataContext is AdExplorerViewModel vm)
+        {
+            vm.ExpandNodeCommand.Execute(node);
+        }
     }
 }

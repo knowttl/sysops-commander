@@ -3,6 +3,7 @@ using FluentAssertions.Events;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Serilog;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 using SysOpsCommander.ViewModels;
@@ -19,6 +20,14 @@ public sealed class MainWindowViewModelTests
     public MainWindowViewModelTests()
     {
         var services = new ServiceCollection();
+
+        services.AddSingleton(_adService);
+        services.AddSingleton(Substitute.For<IHostTargetingService>());
+        services.AddSingleton(Substitute.For<IAuditLogService>());
+        services.AddSingleton(Substitute.For<ISettingsService>());
+        services.AddSingleton(_dialogService);
+        services.AddSingleton(Substitute.For<ILogger>());
+
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<AdExplorerViewModel>();
         services.AddTransient<ExecutionViewModel>();
