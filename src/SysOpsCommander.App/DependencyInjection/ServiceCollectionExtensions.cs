@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 using SysOpsCommander.Infrastructure.Database;
 using SysOpsCommander.Services;
+using SysOpsCommander.Services.Strategies;
 using SysOpsCommander.ViewModels;
 
 namespace SysOpsCommander.App.DependencyInjection;
@@ -27,6 +29,13 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<IScriptValidationService, ScriptValidationService>();
         _ = services.AddSingleton<IDirectoryAccessor, DirectoryAccessor>();
         _ = services.AddSingleton<IActiveDirectoryService, ActiveDirectoryService>();
+
+        _ = services.AddSingleton<IExecutionStrategy, PowerShellRemoteStrategy>();
+        _ = services.AddSingleton<IExecutionStrategy, WmiQueryStrategy>();
+        _ = services.AddSingleton<IRemoteExecutionService, RemoteExecutionService>();
+        _ = services.AddSingleton<ICredentialService, CredentialService>();
+        _ = services.AddSingleton<INotificationService, NotificationService>();
+        _ = services.AddSingleton<IAuditLogService, AuditLogService>();
 
         return services;
     }
@@ -63,6 +72,7 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<DatabaseInitializer>();
         _ = services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
         _ = services.AddSingleton<ISettingsRepository, SettingsRepository>();
+        _ = services.AddSingleton(Log.Logger);
 
         return services;
     }

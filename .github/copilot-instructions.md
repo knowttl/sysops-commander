@@ -87,6 +87,15 @@ SysOpsCommander/
 - Stage all related files before committing — do not leave partial work uncommitted
 - Verify build + tests pass **before** every commit
 
+## UI Verification
+
+- **After any UI change** (XAML, code-behind, styles, theming), **always launch the app** and verify the change is actually visible and working
+- Launch via `Start-Process "src\SysOpsCommander.App\bin\Debug\net8.0-windows\SysOpsCommander.App.exe"` after a successful build
+- Use **UI Automation** (`System.Windows.Automation`) to programmatically inspect the window and verify elements are present, enabled, and properly positioned
+- Check for: window title, all navigation buttons, icons, content area, title bar controls (Minimize/Maximize/Close)
+- Close the app with `Get-Process "SysOpsCommander.App" | Stop-Process -Force` after verification
+- **Never assume** XAML changes render correctly just because the build succeeds — WPF controls can silently fail to display
+
 ## Testing Conventions
 
 - **Framework**: xUnit with `[Fact]` and `[Theory]`
