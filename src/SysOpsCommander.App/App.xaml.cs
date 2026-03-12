@@ -8,6 +8,7 @@ using SysOpsCommander.App.DependencyInjection;
 using SysOpsCommander.Infrastructure.Database;
 using SysOpsCommander.Infrastructure.Logging;
 using SysOpsCommander.ViewModels;
+using Wpf.Ui.Appearance;
 
 namespace SysOpsCommander.App;
 
@@ -55,6 +56,10 @@ public partial class App : Application
         MainWindowViewModel viewModel = _serviceProvider.GetRequiredService<MainWindowViewModel>();
         mainWindow.DataContext = viewModel;
         mainWindow.Show();
+
+        // Apply Mica backdrop and watch for system theme changes
+        ApplicationThemeManager.Apply(mainWindow);
+        SystemThemeWatcher.Watch(mainWindow);
     }
 
     /// <inheritdoc/>
