@@ -31,53 +31,97 @@
 
             <!-- Sidebar Navigation -->
             <Border Grid.Column="0"
-                    Padding="4,8"
-                    Width="220">
-                <StackPanel>
-                    <ui:NavigationViewItem Content="Dashboard"
-                                           Icon="{ui:SymbolIcon Home24}"
-                                           IsActive="True"
-                                           Command="{Binding NavigateCommand}"
-                                           CommandParameter="Dashboard"
-                                           Margin="0,2" />
-                    <ui:NavigationViewItem Content="AD Explorer"
-                                           Icon="{ui:SymbolIcon PeopleTeam24}"
-                                           Command="{Binding NavigateCommand}"
-                                           CommandParameter="ADExplorer"
-                                           Margin="0,2" />
-                    <ui:NavigationViewItem Content="Execution"
-                                           Icon="{ui:SymbolIcon Play24}"
-                                           Command="{Binding NavigateCommand}"
-                                           CommandParameter="Execution"
-                                           Margin="0,2" />
-                    <ui:NavigationViewItem Content="Script Library"
-                                           Icon="{ui:SymbolIcon Code24}"
-                                           Command="{Binding NavigateCommand}"
-                                           CommandParameter="ScriptLibrary"
-                                           Margin="0,2" />
-                    <ui:NavigationViewItem Content="Audit Log"
-                                           Icon="{ui:SymbolIcon ClipboardTextLtr24}"
-                                           Command="{Binding NavigateCommand}"
-                                           CommandParameter="AuditLog"
-                                           Margin="0,2" />
+                    Width="220"
+                    Padding="8,8"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel LastChildFill="False">
+                    <!-- Main nav buttons -->
+                    <StackPanel DockPanel.Dock="Top">
+                        <Button Command="{Binding NavigateCommand}"
+                                CommandParameter="Dashboard"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,2"
+                                Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Home24" Margin="0,0,12,0" />
+                                <TextBlock Text="Dashboard" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding NavigateCommand}"
+                                CommandParameter="ADExplorer"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,2"
+                                Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="PeopleTeam24" Margin="0,0,12,0" />
+                                <TextBlock Text="AD Explorer" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding NavigateCommand}"
+                                CommandParameter="Execution"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,2"
+                                Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Play24" Margin="0,0,12,0" />
+                                <TextBlock Text="Execution" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding NavigateCommand}"
+                                CommandParameter="ScriptLibrary"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,2"
+                                Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Code24" Margin="0,0,12,0" />
+                                <TextBlock Text="Script Library" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding NavigateCommand}"
+                                CommandParameter="AuditLog"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,2"
+                                Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ClipboardTextLtr24" Margin="0,0,12,0" />
+                                <TextBlock Text="Audit Log" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
 
-                    <!-- Spacer pushes Settings to bottom -->
-                    <Separator Margin="8,16" />
-
-                    <ui:NavigationViewItem Content="Settings"
-                                           Icon="{ui:SymbolIcon Settings24}"
-                                           Command="{Binding NavigateCommand}"
-                                           CommandParameter="Settings"
-                                           Margin="0,2" />
-                </StackPanel>
+                    <!-- Settings at the bottom -->
+                    <StackPanel DockPanel.Dock="Bottom">
+                        <Separator Margin="4,8" />
+                        <Button Command="{Binding NavigateCommand}"
+                                CommandParameter="Settings"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,2"
+                                Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Settings24" Margin="0,0,12,0" />
+                                <TextBlock Text="Settings" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
             </Border>
 
             <!-- Content Area -->
             <Border Grid.Column="1"
-                    Margin="4,0,8,8"
-                    Padding="16"
-                    CornerRadius="8">
-                <ContentControl Content="{Binding CurrentView}" />
+                    Margin="0"
+                    Padding="16">
+                <Grid>
+                    <!-- Placeholder shown when no view is selected -->
+                    <TextBlock Text="Select a view from the sidebar to get started."
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="16" />
+                    <!-- Active view content renders on top of placeholder -->
+                    <ContentControl Content="{Binding CurrentView}" />
+                </Grid>
             </Border>
         </Grid>
     </Grid>
