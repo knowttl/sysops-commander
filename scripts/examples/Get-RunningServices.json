@@ -1,0 +1,25 @@
+{
+    "name": "Get-RunningServices",
+    "description": "Lists Windows services with optional filtering by name pattern and status.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Inventory",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": [
+        {
+            "name": "NameFilter",
+            "type": "string",
+            "description": "Wildcard filter for service names",
+            "required": false,
+            "defaultValue": "*"
+        },
+        {
+            "name": "Status",
+            "type": "string",
+            "description": "Filter by service status: All, Running, or Stopped",
+            "required": false,
+            "defaultValue": "All"
+        }
+    ]
+}

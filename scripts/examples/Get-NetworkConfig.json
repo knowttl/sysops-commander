@@ -1,0 +1,10 @@
+{
+    "name": "Get-NetworkConfig",
+    "description": "Lists active network adapter configurations including IP addresses, DNS servers, gateways, and DHCP status.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Networking",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": []
+}

@@ -1,0 +1,17 @@
+{
+    "name": "Restart-Service",
+    "description": "Restarts a specified Windows service and reports before/after status. Requires admin privileges on the target.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Maintenance",
+    "dangerLevel": "Medium",
+    "outputFormat": "Table",
+    "parameters": [
+        {
+            "name": "ServiceName",
+            "type": "string",
+            "description": "The name of the Windows service to restart (e.g., Spooler, WinRM)",
+            "required": true
+        }
+    ]
+}

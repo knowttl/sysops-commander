@@ -1,0 +1,18 @@
+{
+    "name": "Get-OpenPorts",
+    "description": "Lists TCP connections and listening ports with the owning process name.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Networking",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": [
+        {
+            "name": "State",
+            "type": "string",
+            "description": "Filter by connection state: All, Listening, or Established",
+            "required": false,
+            "defaultValue": "Listening"
+        }
+    ]
+}

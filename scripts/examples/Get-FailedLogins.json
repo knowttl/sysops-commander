@@ -1,0 +1,25 @@
+{
+    "name": "Get-FailedLogins",
+    "description": "Retrieves failed login attempts (Event ID 4625) from the Security log with source IP and account details.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Security",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": [
+        {
+            "name": "Hours",
+            "type": "int",
+            "description": "Number of hours to look back",
+            "required": false,
+            "defaultValue": "24"
+        },
+        {
+            "name": "MaxEvents",
+            "type": "int",
+            "description": "Maximum number of events to return",
+            "required": false,
+            "defaultValue": "200"
+        }
+    ]
+}

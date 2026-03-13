@@ -1,0 +1,10 @@
+{
+    "name": "Get-PendingReboot",
+    "description": "Checks whether a system has a pending reboot from Windows Update, CBS, file rename operations, or SCCM.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Maintenance",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": []
+}
