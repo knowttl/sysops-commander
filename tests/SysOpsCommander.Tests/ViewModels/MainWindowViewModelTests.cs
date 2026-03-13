@@ -196,7 +196,7 @@ public sealed class MainWindowViewModelTests
 
         await Task.Delay(100);
 
-        _viewModel.ConnectionStatus.Should().Be("Disconnected");
+        _viewModel.ConnectionStatus.Should().Be("Connected");
         _dialogService.Received().ShowError(Arg.Any<string>(), Arg.Is<string>(s => s.Contains("fail.domain.com")));
     }
 

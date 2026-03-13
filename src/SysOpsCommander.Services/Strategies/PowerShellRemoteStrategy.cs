@@ -118,10 +118,9 @@ public sealed class PowerShellRemoteStrategy : IExecutionStrategy
         catch (PSRemotingTransportException ex) when (ex.Message.Contains("CredSSP", StringComparison.OrdinalIgnoreCase))
         {
             stopwatch.Stop();
-            _logger.Warning(ex, "CredSSP authentication failed on {Hostname}", hostname);
-            return HostResult.Failure(hostname,
-                $"CredSSP authentication failed for {hostname}. " +
-                "Ensure CredSSP is enabled via GPO on both client and server.");
+            string credSspMessage = MapCredSspError(hostname, ex);
+            _logger.Warning(ex, "CredSSP authentication failed on {Hostname}: {Reason}", hostname, credSspMessage);
+            return HostResult.Failure(hostname, credSspMessage);
         }
         catch (PSRemotingTransportException ex)
         {
@@ -194,6 +193,31 @@ public sealed class PowerShellRemoteStrategy : IExecutionStrategy
         };
 
         return connInfo;
+    }
+
+    /// <summary>
+    /// Maps CredSSP-specific WinRM error messages to actionable user guidance.
+    /// </summary>
+    private static string MapCredSspError(string hostname, PSRemotingTransportException ex)
+    {
+        string message = ex.Message;
+
+        return message.Contains("server role is not configured", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("not configured to receive", StringComparison.OrdinalIgnoreCase)
+            ? $"CredSSP is not configured on target {hostname}. " +
+              "Enable via GPO or run `Enable-WSManCredSSP -Role Server` on the target host."
+            : message.Contains("client role is not configured", StringComparison.OrdinalIgnoreCase)
+              || message.Contains("not configured to allow delegating", StringComparison.OrdinalIgnoreCase)
+              || message.Contains("Group Policy", StringComparison.OrdinalIgnoreCase)
+            ? "CredSSP Client is not enabled on this machine. " +
+              "Run `Enable-WSManCredSSP -Role Client -DelegateComputer *` as administrator."
+            : message.Contains("logon failure", StringComparison.OrdinalIgnoreCase)
+              || message.Contains("incorrect user name or password", StringComparison.OrdinalIgnoreCase)
+              || message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase)
+            ? $"CredSSP authentication failed for {hostname}. Verify the username and password."
+            : $"CredSSP authentication failed for {hostname}. " +
+              "Ensure CredSSP is enabled on both client (this machine) and server (target host). " +
+              $"Error: {message}";
     }
 
     private static bool IsTimeout(Exception ex) =>

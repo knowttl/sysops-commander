@@ -1,0 +1,7 @@
+{
+    "version": "1.0.0",
+    "releaseDate": "2026-04-01",
+    "releaseNotes": "Initial release of SysOps Commander.",
+    "minimumVersion": "1.0.0",
+    "sha256": "REPLACE_WITH_ACTUAL_HASH"
+}

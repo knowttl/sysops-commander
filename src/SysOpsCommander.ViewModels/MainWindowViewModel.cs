@@ -244,6 +244,8 @@ public partial class MainWindowViewModel : ObservableObject
         BusyMessage = $"Connecting to {domain.DomainName}...";
         ConnectionStatus = "Connecting";
 
+        DomainConnection previousDomain = _adService.GetActiveDomain();
+
         try
         {
             await _adService.SetActiveDomainAsync(domain, CancellationToken.None);
@@ -253,8 +255,16 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ConnectionStatus = "Disconnected";
             Log.Error(ex, "Failed to switch domain to {DomainName}", domain.DomainName);
+
+            // Restore previous domain in the UI
+            _isInitializing = true;
+            SelectedDomain = previousDomain;
+            CurrentDomainName = previousDomain.DomainName;
+            _isInitializing = false;
+
+            ConnectionStatus = "Connected";
+
             _dialogService.ShowError("Domain Switch Failed", $"Could not connect to {domain.DomainName}: {ex.Message}");
         }
         finally

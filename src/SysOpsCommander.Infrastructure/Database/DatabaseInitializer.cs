@@ -95,5 +95,24 @@ public sealed class DatabaseInitializer
                 "INSERT INTO SchemaVersion (Version, AppliedAt) VALUES (@Version, @AppliedAt)",
                 new { Version = 1, AppliedAt = DateTime.UtcNow.ToString("o") }).ConfigureAwait(false);
         }
+
+        await CreateIndexesAsync(connection).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates performance indexes on frequently queried columns.
+    /// </summary>
+    private static async Task CreateIndexesAsync(SqliteConnection connection)
+    {
+        _ = await connection.ExecuteAsync(
+            "CREATE INDEX IF NOT EXISTS IX_AuditLog_Timestamp ON AuditLog (Timestamp)").ConfigureAwait(false);
+        _ = await connection.ExecuteAsync(
+            "CREATE INDEX IF NOT EXISTS IX_AuditLog_ScriptName ON AuditLog (ScriptName)").ConfigureAwait(false);
+        _ = await connection.ExecuteAsync(
+            "CREATE INDEX IF NOT EXISTS IX_AuditLog_UserName ON AuditLog (UserName)").ConfigureAwait(false);
+        _ = await connection.ExecuteAsync(
+            "CREATE INDEX IF NOT EXISTS IX_AuditLog_Status ON AuditLog (Status)").ConfigureAwait(false);
+        _ = await connection.ExecuteAsync(
+            "CREATE INDEX IF NOT EXISTS IX_AuditLog_CorrelationId ON AuditLog (CorrelationId)").ConfigureAwait(false);
     }
 }

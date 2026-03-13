@@ -123,6 +123,13 @@ public sealed class AutoUpdateService : IAutoUpdateService
 
             await CopyFileAsync(remoteZipPath, localZipPath, cancellationToken);
 
+            FileInfo downloadedFile = new(localZipPath);
+            if (downloadedFile.Length == 0)
+            {
+                File.Delete(localZipPath);
+                return new UpdateDownloadResult(false, null, "Download failed: empty file.");
+            }
+
             if (!string.IsNullOrWhiteSpace(versionInfo.Sha256))
             {
                 string actualHash = await ComputeSha256Async(localZipPath, cancellationToken);

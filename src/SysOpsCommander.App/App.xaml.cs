@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using SysOpsCommander.App.DependencyInjection;
+using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Infrastructure.Database;
 using SysOpsCommander.Infrastructure.Logging;
 using SysOpsCommander.ViewModels;
@@ -52,6 +53,8 @@ public partial class App : Application
         DatabaseInitializer databaseInitializer = _serviceProvider.GetRequiredService<DatabaseInitializer>();
         databaseInitializer.InitializeAsync().GetAwaiter().GetResult();
 
+        CheckPendingUpdate(_serviceProvider);
+
         MainWindow mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         MainWindowViewModel viewModel = _serviceProvider.GetRequiredService<MainWindowViewModel>();
         mainWindow.DataContext = viewModel;
@@ -63,6 +66,27 @@ public partial class App : Application
 
         // Initialize ViewModel after window is shown to avoid blocking startup
         _ = viewModel.InitializeAsync();
+    }
+
+    /// <summary>
+    /// Checks for a staged update and launches the updater if one is ready.
+    /// Cleans up orphaned pending-update markers on failure.
+    /// </summary>
+    private static void CheckPendingUpdate(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            IAutoUpdateService updateService = serviceProvider.GetRequiredService<IAutoUpdateService>();
+            if (updateService.HasPendingUpdate())
+            {
+                Log.Information("Pending update detected — launching updater");
+                updateService.LaunchUpdaterAndExit();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Pending update check failed — continuing normal startup");
+        }
     }
 
     /// <inheritdoc/>
