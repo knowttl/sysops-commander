@@ -306,47 +306,67 @@
 
                         <!-- Row 2: Object class filter pills -->
                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <ToggleButton Content="All"
-                                          IsChecked="{Binding FilterAll}"
+                            <ToggleButton IsChecked="{Binding FilterAll, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="All"
                                           Style="{StaticResource FilterPillStyle}"
+                                          Content="All"
                                           Margin="0,0,4,0"
                                           AutomationProperties.Name="Filter All" />
-                            <ToggleButton Content="&#xE77B; Users"
-                                          IsChecked="{Binding FilterUsers}"
+                            <ToggleButton IsChecked="{Binding FilterUsers, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="user"
                                           Style="{StaticResource FilterPillStyle}"
                                           Margin="0,0,4,0"
-                                          AutomationProperties.Name="Filter Users" />
-                            <ToggleButton Content="&#xE7F8; Computers"
-                                          IsChecked="{Binding FilterComputers}"
+                                          AutomationProperties.Name="Filter Users">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBlock Text="Users" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding FilterComputers, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="computer"
                                           Style="{StaticResource FilterPillStyle}"
                                           Margin="0,0,4,0"
-                                          AutomationProperties.Name="Filter Computers" />
-                            <ToggleButton Content="&#xE716; Groups"
-                                          IsChecked="{Binding FilterGroups}"
+                                          AutomationProperties.Name="Filter Computers">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE7F8;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBlock Text="Computers" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding FilterGroups, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="group"
                                           Style="{StaticResource FilterPillStyle}"
                                           Margin="0,0,4,0"
-                                          AutomationProperties.Name="Filter Groups" />
-                            <ToggleButton Content="&#xED41; OUs"
-                                          IsChecked="{Binding FilterOus}"
+                                          AutomationProperties.Name="Filter Groups">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBlock Text="Groups" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding FilterOus, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="organizationalUnit"
                                           Style="{StaticResource FilterPillStyle}"
                                           Margin="0,0,4,0"
-                                          AutomationProperties.Name="Filter OUs" />
-                            <ToggleButton Content="&#xE779; Contacts"
-                                          IsChecked="{Binding FilterContacts}"
+                                          AutomationProperties.Name="Filter OUs">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xED41;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBlock Text="OUs" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding FilterContacts, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="contact"
                                           Style="{StaticResource FilterPillStyle}"
-                                          AutomationProperties.Name="Filter Contacts" />
+                                          AutomationProperties.Name="Filter Contacts">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE779;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBlock Text="Contacts" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
                         </StackPanel>
 
                         <!-- Row 3: Scope context line -->

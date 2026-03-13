@@ -493,7 +493,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             default: break;
         }
 
-        // If no individual filters are active, reactivate All
         if (!FilterUsers && !FilterComputers && !FilterGroups && !FilterOus && !FilterContacts)
         {
             FilterAll = true;
