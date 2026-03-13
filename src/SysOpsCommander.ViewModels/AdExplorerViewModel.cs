@@ -55,6 +55,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [ObservableProperty]
     private string _treeFilterText = string.Empty;
 
+    [ObservableProperty]
+    private bool _isZone1Collapsed;
+
+    [ObservableProperty]
+    private bool _isZone3Collapsed;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AdExplorerViewModel"/> class.
     /// </summary>
@@ -298,6 +304,18 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         ResultStatus = $"Sent {computers.Count} computers to Execution Targets.";
         _logger.Information("Sent {Count} AD computers to execution targets", computers.Count);
     }
+
+    /// <summary>
+    /// Toggles the collapsed state of Zone 1 (OU Navigator).
+    /// </summary>
+    [RelayCommand]
+    private void ToggleZone1() => IsZone1Collapsed = !IsZone1Collapsed;
+
+    /// <summary>
+    /// Toggles the collapsed state of Zone 3 (Detail Inspector).
+    /// </summary>
+    [RelayCommand]
+    private void ToggleZone3() => IsZone3Collapsed = !IsZone3Collapsed;
 
     partial void OnSelectedObjectChanged(AdObject? value)
     {

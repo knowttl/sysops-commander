@@ -8,6 +8,13 @@
              d:DesignHeight="700" d:DesignWidth="1200"
              d:DataContext="{d:DesignInstance Type=vm:AdExplorerViewModel}"
              AutomationProperties.Name="AD Explorer View">
+
+    <!-- Keyboard shortcuts -->
+    <UserControl.InputBindings>
+        <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ToggleZone1Command}" />
+        <KeyBinding Key="D3" Modifiers="Control" Command="{Binding ToggleZone3Command}" />
+    </UserControl.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -17,11 +24,11 @@
         <!-- Main 4-zone layout -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="200" MaxWidth="450" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="Zone1Column" Width="280" MinWidth="40" MaxWidth="450" />
+                <ColumnDefinition x:Name="Splitter1Column" Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="320" MinWidth="250" MaxWidth="600" />
+                <ColumnDefinition x:Name="Splitter3Column" Width="Auto" />
+                <ColumnDefinition x:Name="Zone3Column" Width="320" MinWidth="40" MaxWidth="600" />
             </Grid.ColumnDefinitions>
 
             <!-- ═══════════════════════════════════════════════════ -->
@@ -30,28 +37,31 @@
             <Border Grid.Column="0"
                     Style="{StaticResource ZonePanelBorderStyle}">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+                    <!-- Expanded content -->
+                    <Grid Visibility="{Binding IsZone1Collapsed, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                    <!-- Panel header -->
-                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderBorderStyle}">
-                        <DockPanel>
-                            <TextBlock Text="OU Navigator"
-                                       Style="{StaticResource PanelTitleStyle}"
-                                       VerticalAlignment="Center" />
-                            <Button DockPanel.Dock="Right"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource PanelChevronButtonStyle}"
-                                    AutomationProperties.Name="Collapse OU Navigator"
-                                    ToolTip="Collapse (Ctrl+1)">
-                                <TextBlock Text="&#xE76B;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
-                            </Button>
-                        </DockPanel>
-                    </Border>
+                        <!-- Panel header -->
+                        <Border Grid.Row="0" Style="{StaticResource PanelHeaderBorderStyle}">
+                            <DockPanel>
+                                <TextBlock Text="OU Navigator"
+                                           Style="{StaticResource PanelTitleStyle}"
+                                           VerticalAlignment="Center" />
+                                <Button DockPanel.Dock="Right"
+                                        HorizontalAlignment="Right"
+                                        Command="{Binding ToggleZone1Command}"
+                                        Style="{StaticResource PanelChevronButtonStyle}"
+                                        AutomationProperties.Name="Collapse OU Navigator"
+                                        ToolTip="Collapse (Ctrl+1)">
+                                    <TextBlock Text="&#xE76B;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                                </Button>
+                            </DockPanel>
+                        </Border>
 
                     <!-- Load Tree button -->
                     <Button Grid.Row="1"
@@ -115,11 +125,32 @@
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>
+                    </Grid>
+
+                    <!-- Collapsed rail (40px icon strip) -->
+                    <StackPanel Visibility="{Binding IsZone1Collapsed, Converter={StaticResource BoolToVisibilityConverter}}"
+                                HorizontalAlignment="Center"
+                                Margin="0,8,0,0">
+                        <Button Command="{Binding ToggleZone1Command}"
+                                Style="{StaticResource PanelChevronButtonStyle}"
+                                AutomationProperties.Name="Expand OU Navigator"
+                                ToolTip="Expand (Ctrl+1)"
+                                Margin="0,0,0,12">
+                            <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                        </Button>
+                        <TextBlock Text="&#xE774;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
             <!-- GridSplitter: Zone 1 | Zone 2 -->
             <GridSplitter Grid.Column="1"
+                          x:Name="Splitter1"
+                          IsEnabled="{Binding IsZone1Collapsed, Converter={StaticResource InverseBoolConverter}}"
                           Style="{StaticResource ThemedGridSplitterStyle}" />
 
             <!-- ═══════════════════════════════════════════════════ -->
@@ -283,6 +314,8 @@
 
             <!-- GridSplitter: Zone 2 | Zone 3 -->
             <GridSplitter Grid.Column="3"
+                          x:Name="Splitter3"
+                          IsEnabled="{Binding IsZone3Collapsed, Converter={StaticResource InverseBoolConverter}}"
                           Style="{StaticResource ThemedGridSplitterStyle}" />
 
             <!-- ═══════════════════════════════════════════════════ -->
@@ -291,27 +324,30 @@
             <Border Grid.Column="4"
                     Style="{StaticResource ZonePanelBorderStyle}">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+                    <!-- Expanded content -->
+                    <Grid Visibility="{Binding IsZone3Collapsed, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                    <!-- Panel header -->
-                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderBorderStyle}">
-                        <DockPanel>
-                            <TextBlock Text="Detail Inspector"
-                                       Style="{StaticResource PanelTitleStyle}"
-                                       VerticalAlignment="Center" />
-                            <Button DockPanel.Dock="Right"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource PanelChevronButtonStyle}"
-                                    AutomationProperties.Name="Collapse Detail Inspector"
-                                    ToolTip="Collapse (Ctrl+3)">
-                                <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
-                            </Button>
-                        </DockPanel>
-                    </Border>
+                        <!-- Panel header -->
+                        <Border Grid.Row="0" Style="{StaticResource PanelHeaderBorderStyle}">
+                            <DockPanel>
+                                <TextBlock Text="Detail Inspector"
+                                           Style="{StaticResource PanelTitleStyle}"
+                                           VerticalAlignment="Center" />
+                                <Button DockPanel.Dock="Right"
+                                        HorizontalAlignment="Right"
+                                        Command="{Binding ToggleZone3Command}"
+                                        Style="{StaticResource PanelChevronButtonStyle}"
+                                        AutomationProperties.Name="Collapse Detail Inspector"
+                                        ToolTip="Collapse (Ctrl+3)">
+                                    <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                                </Button>
+                            </DockPanel>
+                        </Border>
 
                     <!-- Object header card -->
                     <Border Grid.Row="1" Padding="10,8"
@@ -455,6 +491,25 @@
                                    Margin="0,0,0,8" />
                         <TextBlock Text="Select an object to view details"
                                    Style="{StaticResource LabelStyle}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                    </Grid>
+
+                    <!-- Collapsed rail (40px icon strip) -->
+                    <StackPanel Visibility="{Binding IsZone3Collapsed, Converter={StaticResource BoolToVisibilityConverter}}"
+                                HorizontalAlignment="Center"
+                                Margin="0,8,0,0">
+                        <Button Command="{Binding ToggleZone3Command}"
+                                Style="{StaticResource PanelChevronButtonStyle}"
+                                AutomationProperties.Name="Expand Detail Inspector"
+                                ToolTip="Expand (Ctrl+3)"
+                                Margin="0,0,0,12">
+                            <TextBlock Text="&#xE76B;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                        </Button>
+                        <TextBlock Text="{Binding SelectedObject.ObjectClass, Converter={StaticResource ObjectClassToIconConverter}}"
+                                   Foreground="{Binding SelectedObject.ObjectClass, Converter={StaticResource ObjectClassToIconColorConverter}}"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="18"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
                 </Grid>
