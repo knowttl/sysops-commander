@@ -7,12 +7,21 @@ namespace SysOpsCommander.App.Converters;
 /// <summary>
 /// Converts a <see cref="bool"/> to <see cref="Visibility"/>. <see langword="true"/> maps to
 /// <see cref="Visibility.Visible"/>; <see langword="false"/> maps to <see cref="Visibility.Collapsed"/>.
+/// Pass "invert" as <c>ConverterParameter</c> to reverse the mapping.
 /// </summary>
 public sealed class BoolToVisibilityConverter : IValueConverter
 {
     /// <inheritdoc/>
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is true ? Visibility.Visible : Visibility.Collapsed;
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        bool flag = value is true;
+        if (parameter is string s && s.Equals("invert", StringComparison.OrdinalIgnoreCase))
+        {
+            flag = !flag;
+        }
+
+        return flag ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     /// <inheritdoc/>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
