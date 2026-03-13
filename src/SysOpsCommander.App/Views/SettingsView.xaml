@@ -47,7 +47,7 @@
                 <TextBlock Text="Settings"
                            Style="{StaticResource SectionHeaderStyle}" />
                 <TextBlock Text=" *" FontSize="18" FontWeight="SemiBold"
-                           Foreground="#F39C12"
+                           Foreground="{DynamicResource AccentAmberBrush}"
                            Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
             <Button Grid.Column="1" Content="Save" Margin="0,0,8,0"

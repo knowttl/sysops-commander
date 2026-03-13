@@ -35,19 +35,19 @@
 
     <!-- Error Text Style -->
     <Style x:Key="ErrorTextStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="#E74C3C" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentRedBrush}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <!-- Warning Text Style -->
     <Style x:Key="WarningTextStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="#F39C12" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentAmberBrush}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <!-- Success Text Style -->
     <Style x:Key="SuccessTextStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="#2ECC71" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentGreenBrush}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
