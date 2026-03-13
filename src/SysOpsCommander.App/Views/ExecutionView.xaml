@@ -3,11 +3,438 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:enums="clr-namespace:SysOpsCommander.Core.Enums;assembly=SysOpsCommander.Core"
+             xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
+             d:DesignHeight="750" d:DesignWidth="1200"
+             d:DataContext="{d:DesignInstance Type=vm:ExecutionViewModel}"
              AutomationProperties.Name="Execution View">
+    <UserControl.Resources>
+        <ObjectDataProvider x:Key="AuthMethods"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="enums:WinRmAuthMethod" />
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+        <ObjectDataProvider x:Key="TransportTypes"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="enums:WinRmTransport" />
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+    </UserControl.Resources>
+
     <Grid>
-        <TextBlock Text="Execution — Coming in Phase 8"
-                   Style="{StaticResource PlaceholderTextStyle}" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="250" MinHeight="100" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="Remote Execution"
+                   Style="{StaticResource SectionHeaderStyle}"
+                   Margin="0,0,0,8" />
+
+        <!-- Main layout: 3-column -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" MinWidth="160" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Target Hosts Panel -->
+            <Border Grid.Column="0"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Target Hosts"
+                               FontWeight="SemiBold" Margin="0,0,0,4" />
+
+                    <!-- Add host -->
+                    <Grid Grid.Row="1" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding NewHostname, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="New Hostname Input" />
+                        <Button Grid.Column="1" Content="+"
+                                Command="{Binding AddHostCommand}"
+                                Margin="4,0,0,0" Width="28"
+                                ToolTip="Add host"
+                                AutomationProperties.Name="Add Host Button" />
+                    </Grid>
+
+                    <!-- Host list -->
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding Targets}"
+                             AutomationProperties.Name="Target Host List"
+                             VirtualizingStackPanel.IsVirtualizing="True">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Grid.Column="0" Width="8" Height="8"
+                                             Margin="0,0,6,0"
+                                             Fill="{Binding Status, Converter={StaticResource StatusToColorConverter}}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Hostname}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    <Button Grid.Column="2" Content="✕"
+                                            Command="{Binding DataContext.RemoveHostCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding Hostname}"
+                                            FontSize="10" Padding="2"
+                                            ToolTip="Remove host"
+                                            AutomationProperties.Name="Remove Host" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Target actions -->
+                    <StackPanel Grid.Row="3" Margin="0,4,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Import CSV"
+                                    Command="{Binding ImportCsvCommand}"
+                                    Margin="0,0,2,0"
+                                    AutomationProperties.Name="Import CSV Button" />
+                            <Button Grid.Column="1" Content="Check"
+                                    Command="{Binding CheckReachabilityCommand}"
+                                    Margin="2,0,0,0"
+                                    ToolTip="Check reachability"
+                                    AutomationProperties.Name="Check Reachability Button" />
+                        </Grid>
+                        <Button Content="Clear All"
+                                Command="{Binding ClearHostsCommand}"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,4,0,0"
+                                AutomationProperties.Name="Clear Hosts Button" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="4"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent" />
+
+            <!-- Right: Script Selection + WinRM Config -->
+            <Border Grid.Column="2"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Script Selection Header -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Script"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding AvailableScripts}"
+                                  SelectedItem="{Binding SelectedScript}"
+                                  DisplayMemberPath="FileName"
+                                  Margin="8,0"
+                                  IsEnabled="{Binding IsAdHocMode, Converter={StaticResource InverseBoolConverter}}"
+                                  AutomationProperties.Name="Script Selector" />
+                        <ToggleButton Grid.Column="2"
+                                      Content="Ad-Hoc"
+                                      IsChecked="{Binding IsAdHocMode}"
+                                      ToolTip="Toggle ad-hoc script entry"
+                                      AutomationProperties.Name="Ad-Hoc Mode Toggle" />
+                    </Grid>
+
+                    <!-- Script Content Area -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Danger Warning -->
+                            <TextBlock Text="{Binding ScriptDangerWarning}"
+                                       Style="{StaticResource WarningTextStyle}"
+                                       Visibility="{Binding ScriptDangerWarning, Converter={StaticResource StringToVisibilityConverter}}"
+                                       Margin="0,0,0,8" />
+
+                            <!-- Ad-hoc script editor -->
+                            <TextBox Text="{Binding AdHocScriptContent, UpdateSourceTrigger=PropertyChanged}"
+                                     Visibility="{Binding IsAdHocMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="True"
+                                     TextWrapping="Wrap"
+                                     FontFamily="Consolas"
+                                     MinHeight="120"
+                                     VerticalScrollBarVisibility="Auto"
+                                     AutomationProperties.Name="Ad-Hoc Script Editor" />
+
+                            <!-- Parameters -->
+                            <TextBlock Text="Parameters"
+                                       FontWeight="SemiBold"
+                                       Margin="0,8,0,4"
+                                       Visibility="{Binding ScriptParameters.Count, Converter={StaticResource CountToVisibilityConverter}}" />
+                            <ItemsControl ItemsSource="{Binding ScriptParameters}"
+                                          AutomationProperties.Name="Script Parameters">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text=" *" Foreground="Red"
+                                                           Visibility="{Binding IsRequired, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                            </StackPanel>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="{Binding Description}"
+                                                     AutomationProperties.Name="{Binding DisplayName}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- WinRM Configuration -->
+                            <TextBlock Text="WinRM Configuration"
+                                       FontWeight="SemiBold" Margin="0,12,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Auth:" VerticalAlignment="Center"
+                                           Margin="0,0,8,4" />
+                                <ComboBox Grid.Row="0" Grid.Column="1"
+                                          ItemsSource="{Binding Source={StaticResource AuthMethods}}"
+                                          SelectedItem="{Binding SelectedAuthMethod}"
+                                          Margin="0,0,12,4"
+                                          AutomationProperties.Name="Auth Method" />
+                                <TextBlock Grid.Row="0" Grid.Column="2"
+                                           Text="Transport:" VerticalAlignment="Center"
+                                           Margin="0,0,8,4" />
+                                <ComboBox Grid.Row="0" Grid.Column="3"
+                                          ItemsSource="{Binding Source={StaticResource TransportTypes}}"
+                                          SelectedItem="{Binding SelectedTransport}"
+                                          Margin="0,0,0,4"
+                                          AutomationProperties.Name="Transport" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Port:" VerticalAlignment="Center"
+                                           Margin="0,0,8,4" />
+                                <TextBox Grid.Row="1" Grid.Column="1"
+                                         Text="{Binding CustomPort, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,12,4"
+                                         AutomationProperties.Name="Custom Port" />
+                                <TextBlock Grid.Row="1" Grid.Column="2"
+                                           Text="Throttle:" VerticalAlignment="Center"
+                                           Margin="0,0,8,4" />
+                                <TextBox Grid.Row="1" Grid.Column="3"
+                                         Text="{Binding ThrottleLimit, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,4"
+                                         AutomationProperties.Name="Throttle Limit" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                                           Text="Timeout:" VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <TextBox Grid.Row="2" Grid.Column="1"
+                                         Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Timeout Seconds" />
+                            </Grid>
+
+                            <!-- CredSSP Warning -->
+                            <TextBlock Text="{Binding CredSspWarning}"
+                                       Style="{StaticResource WarningTextStyle}"
+                                       Visibility="{Binding CredSspWarning, Converter={StaticResource StringToVisibilityConverter}}"
+                                       Margin="0,4,0,0" />
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Execute / Cancel -->
+                    <Grid Grid.Row="2" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ExecutionProgress}"
+                                       Margin="0,0,8,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <ProgressBar Width="120" Height="16"
+                                         Minimum="0" Maximum="{Binding TotalHostCount}"
+                                         Value="{Binding CompletedHostCount}"
+                                         Visibility="{Binding IsExecuting, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Cancel"
+                                Command="{Binding CancelExecutionCommand}"
+                                Margin="0,0,4,0"
+                                Visibility="{Binding IsExecuting, Converter={StaticResource BoolToVisibilityConverter}}"
+                                AutomationProperties.Name="Cancel Execution" />
+                        <Button Grid.Column="2" Content="Execute"
+                                Command="{Binding ExecuteCommand}"
+                                FontWeight="SemiBold"
+                                AutomationProperties.Name="Execute Script" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Horizontal splitter -->
+        <GridSplitter Grid.Row="2" Height="4"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Center"
+                      Background="Transparent" />
+
+        <!-- Bottom: Results Panel -->
+        <Border Grid.Row="3"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="1" CornerRadius="4"
+                Padding="8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="350" MinWidth="200" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Results DataGrid -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Results"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="CSV"
+                                Command="{Binding ExportToCsvCommand}"
+                                Margin="0,0,4,0"
+                                AutomationProperties.Name="Export CSV" />
+                        <Button Grid.Column="2" Content="Excel"
+                                Command="{Binding ExportToExcelCommand}"
+                                AutomationProperties.Name="Export Excel" />
+                    </Grid>
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding Results}"
+                              SelectedItem="{Binding SelectedResult}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              CanUserSortColumns="True"
+                              AutomationProperties.Name="Execution Results">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Host" Binding="{Binding Hostname}" Width="*" />
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="90" />
+                            <DataGridTextColumn Header="Duration" Binding="{Binding Duration, StringFormat={}{0:mm\\:ss\\.ff}}" Width="80" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <GridSplitter Grid.Column="1" Width="4"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Stretch"
+                              Background="Transparent" />
+
+                <!-- Result Detail -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Output"
+                               FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBox Grid.Row="1"
+                             Text="{Binding ResultDetailOutput, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontFamily="Consolas"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             AcceptsReturn="True"
+                             AutomationProperties.Name="Result Output" />
+
+                    <TextBox Grid.Row="2"
+                             Text="{Binding ResultErrors, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontFamily="Consolas"
+                             Foreground="Red"
+                             TextWrapping="Wrap"
+                             MaxHeight="60"
+                             VerticalScrollBarVisibility="Auto"
+                             AcceptsReturn="True"
+                             Visibility="{Binding ResultErrors, Converter={StaticResource StringToVisibilityConverter}}"
+                             AutomationProperties.Name="Result Errors" />
+
+                    <TextBox Grid.Row="3"
+                             Text="{Binding ResultWarnings, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontFamily="Consolas"
+                             Foreground="Orange"
+                             TextWrapping="Wrap"
+                             MaxHeight="60"
+                             VerticalScrollBarVisibility="Auto"
+                             AcceptsReturn="True"
+                             Visibility="{Binding ResultWarnings, Converter={StaticResource StringToVisibilityConverter}}"
+                             AutomationProperties.Name="Result Warnings" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Status Bar -->
+        <TextBlock Grid.Row="4"
+                   Text="{Binding StatusMessage}"
+                   Margin="0,8,0,0"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   AutomationProperties.Name="Execution Status" />
     </Grid>
 </UserControl>

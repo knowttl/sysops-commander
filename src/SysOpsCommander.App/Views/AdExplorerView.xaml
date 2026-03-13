@@ -106,6 +106,7 @@
                             Command="{Binding LoadTreeRootCommand}"
                             HorizontalAlignment="Stretch"
                             Margin="0,0,0,4"
+                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                             AutomationProperties.Name="Load AD Tree" />
                     <TreeView Grid.Row="1"
                               ItemsSource="{Binding TreeNodes}"
@@ -115,7 +116,8 @@
                               VirtualizingStackPanel.VirtualizationMode="Recycling">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Name}" />
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
                         <TreeView.ItemContainerStyle>

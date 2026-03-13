@@ -5,6 +5,9 @@
     <!-- Value Converters -->
     <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
     <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+    <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+    <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />
 
     <!-- Navigation Button Style -->
     <Style x:Key="NavButtonStyle" TargetType="Button">

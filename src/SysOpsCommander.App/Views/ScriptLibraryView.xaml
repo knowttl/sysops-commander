@@ -3,11 +3,222 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
+             d:DesignHeight="650" d:DesignWidth="1000"
+             d:DataContext="{d:DesignInstance Type=vm:ScriptLibraryViewModel}"
              AutomationProperties.Name="Script Library View">
     <Grid>
-        <TextBlock Text="Script Library — Coming in Phase 8"
-                   Style="{StaticResource PlaceholderTextStyle}" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Script Library"
+                       Style="{StaticResource SectionHeaderStyle}" />
+
+            <Button Grid.Column="2" Content="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    AutomationProperties.Name="Refresh Script Library" />
+        </Grid>
+
+        <!-- Search + Filter -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="160" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox Grid.Column="0"
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="Script Search Box" />
+
+            <TextBlock Grid.Column="1" Text="Category:"
+                       VerticalAlignment="Center"
+                       Margin="12,0,8,0" />
+            <ComboBox Grid.Column="2"
+                      ItemsSource="{Binding Categories}"
+                      SelectedItem="{Binding SelectedCategory}"
+                      AutomationProperties.Name="Category Filter" />
+        </Grid>
+
+        <!-- Main: Script List + Detail Panel -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="350" MinWidth="250" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Script List -->
+            <Border Grid.Column="0"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="4">
+                <DataGrid ItemsSource="{Binding FilteredScripts}"
+                          SelectedItem="{Binding SelectedScript}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          CanUserSortColumns="True"
+                          AutomationProperties.Name="Script List">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="*" />
+                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="120" />
+                        <DataGridTextColumn Header="Danger Level" Binding="{Binding EffectiveDangerLevel}" Width="100" />
+                        <DataGridCheckBoxColumn Header="Manifest" Binding="{Binding HasManifest, Mode=OneWay}" Width="70" />
+                        <DataGridCheckBoxColumn Header="Valid" Binding="{Binding IsValidated, Mode=OneWay}" Width="60" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="4"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent" />
+
+            <!-- Detail Panel -->
+            <Border Grid.Column="2"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="4"
+                    Padding="8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Script Details"
+                                   FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                        <TextBlock Text="{Binding ScriptDetailName}"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+
+                        <TextBlock Text="{Binding ScriptDetailDescription}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,8"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                        <!-- Metadata -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Version:"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding ScriptDetailVersion}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Author:"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="{Binding ScriptDetailAuthor}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Category:"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                       Text="{Binding ScriptDetailCategory}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Danger:"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="3" Grid.Column="1"
+                                       Text="{Binding ScriptDetailDangerLevel}" />
+                        </Grid>
+
+                        <!-- Parameters -->
+                        <TextBlock Text="Parameters"
+                                   FontWeight="SemiBold" Margin="0,0,0,4"
+                                   Visibility="{Binding ScriptDetailParameters, Converter={StaticResource StringToVisibilityConverter}}" />
+                        <TextBox Text="{Binding ScriptDetailParameters, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas"
+                                 FontSize="11"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 Visibility="{Binding ScriptDetailParameters, Converter={StaticResource StringToVisibilityConverter}}"
+                                 AutomationProperties.Name="Script Parameters Detail" />
+
+                        <!-- Validation Errors -->
+                        <TextBlock Text="Validation Errors"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,4"
+                                   Foreground="Red"
+                                   Visibility="{Binding ScriptDetailValidationErrors, Converter={StaticResource StringToVisibilityConverter}}" />
+                        <TextBox Text="{Binding ScriptDetailValidationErrors, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas"
+                                 Foreground="Red"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 Visibility="{Binding ScriptDetailValidationErrors, Converter={StaticResource StringToVisibilityConverter}}"
+                                 AutomationProperties.Name="Validation Errors" />
+
+                        <!-- Warnings -->
+                        <TextBlock Text="Warnings"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,4"
+                                   Foreground="Orange"
+                                   Visibility="{Binding ScriptDetailWarnings, Converter={StaticResource StringToVisibilityConverter}}" />
+                        <TextBox Text="{Binding ScriptDetailWarnings, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas"
+                                 Foreground="Orange"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 Visibility="{Binding ScriptDetailWarnings, Converter={StaticResource StringToVisibilityConverter}}"
+                                 AutomationProperties.Name="Script Warnings" />
+
+                        <!-- Dangerous Patterns -->
+                        <TextBlock Text="Dangerous Patterns"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,4"
+                                   Foreground="Red"
+                                   Visibility="{Binding DangerousPatterns.Count, Converter={StaticResource CountToVisibilityConverter}}" />
+                        <ItemsControl ItemsSource="{Binding DangerousPatterns}"
+                                      Visibility="{Binding DangerousPatterns.Count, Converter={StaticResource CountToVisibilityConverter}}"
+                                      AutomationProperties.Name="Dangerous Patterns List">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,2">
+                                        <TextBlock Foreground="Red">
+                                            <Run Text="{Binding PatternName, Mode=OneWay}" FontWeight="SemiBold" />
+                                            <Run Text=" (Line " /><Run Text="{Binding LineNumber, Mode=OneWay}" /><Run Text=")" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Description}"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   Margin="8,0,0,0"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Status Bar -->
+        <TextBlock Grid.Row="3"
+                   Text="{Binding StatusMessage}"
+                   Margin="0,8,0,0"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   AutomationProperties.Name="Script Library Status" />
     </Grid>
 </UserControl>

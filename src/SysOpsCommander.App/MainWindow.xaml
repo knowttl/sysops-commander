@@ -130,16 +130,27 @@
             <Border Grid.Column="1"
                     Margin="0"
                     Padding="16">
-                <Grid>
-                    <!-- Placeholder shown when no view is selected -->
-                    <TextBlock Text="Select a view from the sidebar to get started."
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontSize="16" />
-                    <!-- Active view content renders on top of placeholder -->
-                    <ContentControl Content="{Binding CurrentView}" />
-                </Grid>
+                <ContentControl Content="{Binding CurrentView}">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentView}" Value="{x:Null}">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate>
+                                                <TextBlock Text="Select a view from the sidebar to get started."
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="16" />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                </ContentControl>
             </Border>
 
             <!-- Loading Overlay -->
