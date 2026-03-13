@@ -61,6 +61,54 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [ObservableProperty]
     private bool _isZone3Collapsed;
 
+    [ObservableProperty]
+    private bool _isInspectorExpanded;
+
+    [ObservableProperty]
+    private string _selectedAttribute = "All attributes";
+
+    [ObservableProperty]
+    private bool _filterUsers;
+
+    [ObservableProperty]
+    private bool _filterComputers;
+
+    [ObservableProperty]
+    private bool _filterGroups;
+
+    [ObservableProperty]
+    private bool _filterOus;
+
+    [ObservableProperty]
+    private bool _filterContacts;
+
+    [ObservableProperty]
+    private bool _filterAll = true;
+
+    [ObservableProperty]
+    private bool _searchEntireDomain;
+
+    [ObservableProperty]
+    private string _scopeDisplay = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<BreadcrumbSegment> _breadcrumbSegments = [];
+
+    /// <summary>
+    /// Gets the list of searchable attribute options.
+    /// </summary>
+    public IReadOnlyList<string> AttributeOptions { get; } =
+    [
+        "All attributes",
+        "sAMAccountName",
+        "cn",
+        "displayName",
+        "mail",
+        "SID",
+        "description",
+        "distinguishedName"
+    ];
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AdExplorerViewModel"/> class.
     /// </summary>
@@ -177,9 +225,14 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         try
         {
-            AdSearchResult result = await _adService.SearchAsync(SearchText, _cts.Token);
-            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            string? attribute = SelectedAttribute == "All attributes" ? null : SelectedAttribute;
+            IReadOnlyList<string>? objectClasses = GetActiveObjectClassFilters();
+            string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
 
+            AdSearchResult result = await _adService.SearchScopedAsync(
+                SearchText, baseDn, objectClasses, attribute, _cts.Token);
+
+            SearchResults = new ObservableCollection<AdObject>(result.Results);
             ResultStatus = $"{result.TotalResultCount} results found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
         }
         catch (OperationCanceledException)
@@ -195,6 +248,22 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         {
             IsSearching = false;
         }
+    }
+
+    private List<string>? GetActiveObjectClassFilters()
+    {
+        if (FilterAll)
+        {
+            return null;
+        }
+
+        var filters = new List<string>();
+        if (FilterUsers) { filters.Add("user"); }
+        if (FilterComputers) { filters.Add("computer"); }
+        if (FilterGroups) { filters.Add("group"); }
+        if (FilterOus) { filters.Add("organizationalUnit"); }
+        if (FilterContacts) { filters.Add("contact"); }
+        return filters.Count > 0 ? filters : null;
     }
 
     /// <summary>
@@ -306,6 +375,71 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     }
 
     /// <summary>
+    /// Shows the members of the currently selected group object.
+    /// </summary>
+    [RelayCommand]
+    private async Task ShowGroupMembersAsync()
+    {
+        if (SelectedObject is null ||
+            !SelectedObject.ObjectClass.Equals("group", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        IsSearching = true;
+        ResultStatus = "Loading group members...";
+
+        try
+        {
+            AdSearchResult result = await _adService.GetGroupMembersAsync(
+                SelectedObject.DistinguishedName, recursive: true, _cts.Token);
+
+            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            ResultStatus = $"{result.TotalResultCount} members found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
+        }
+        catch (OperationCanceledException)
+        {
+            ResultStatus = "Operation cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to load group members for {DN}", SelectedObject.DistinguishedName);
+            ResultStatus = $"Failed to load group members: {ex.Message}";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>
+    /// Scopes the search to the selected object's OU.
+    /// </summary>
+    [RelayCommand]
+    private void ScopeToSelectedOu()
+    {
+        if (SelectedObject is null)
+        {
+            return;
+        }
+
+        string dn = SelectedObject.DistinguishedName;
+        if (SelectedObject.ObjectClass.Equals("organizationalUnit", StringComparison.OrdinalIgnoreCase) ||
+            SelectedObject.ObjectClass.Equals("container", StringComparison.OrdinalIgnoreCase))
+        {
+            SetScope(dn);
+        }
+        else
+        {
+            int commaIndex = dn.IndexOf(',');
+            if (commaIndex > 0)
+            {
+                SetScope(dn[(commaIndex + 1)..]);
+            }
+        }
+    }
+
+    /// <summary>
     /// Toggles the collapsed state of Zone 1 (OU Navigator).
     /// </summary>
     [RelayCommand]
@@ -316,6 +450,118 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// </summary>
     [RelayCommand]
     private void ToggleZone3() => IsZone3Collapsed = !IsZone3Collapsed;
+
+    /// <summary>
+    /// Expands the Detail Inspector to overlay the workspace.
+    /// </summary>
+    [RelayCommand]
+    private void ExpandInspector() => IsInspectorExpanded = true;
+
+    /// <summary>
+    /// Collapses the Detail Inspector back to its normal width.
+    /// </summary>
+    [RelayCommand]
+    private void CollapseInspector() => IsInspectorExpanded = false;
+
+    /// <summary>
+    /// Toggles a specific object class filter pill.
+    /// </summary>
+    /// <param name="objectClass">The object class filter to toggle (Users, Computers, Groups, OUs, Contacts, All).</param>
+    [RelayCommand]
+    private void ToggleFilter(string? objectClass)
+    {
+        if (objectClass == "All")
+        {
+            FilterAll = true;
+            FilterUsers = false;
+            FilterComputers = false;
+            FilterGroups = false;
+            FilterOus = false;
+            FilterContacts = false;
+            return;
+        }
+
+        FilterAll = false;
+
+        switch (objectClass)
+        {
+            case "user": FilterUsers = !FilterUsers; break;
+            case "computer": FilterComputers = !FilterComputers; break;
+            case "group": FilterGroups = !FilterGroups; break;
+            case "organizationalUnit": FilterOus = !FilterOus; break;
+            case "contact": FilterContacts = !FilterContacts; break;
+            default: break;
+        }
+
+        // If no individual filters are active, reactivate All
+        if (!FilterUsers && !FilterComputers && !FilterGroups && !FilterOus && !FilterContacts)
+        {
+            FilterAll = true;
+        }
+    }
+
+    /// <summary>
+    /// Resets the search scope to the domain root.
+    /// </summary>
+    [RelayCommand]
+    private void ResetScope()
+    {
+        ScopeDisplay = string.Empty;
+        SearchEntireDomain = false;
+        BreadcrumbSegments.Clear();
+    }
+
+    /// <summary>
+    /// Sets the search scope to the specified OU distinguished name.
+    /// </summary>
+    /// <param name="distinguishedName">The DN of the OU to scope searches to.</param>
+    [RelayCommand]
+    private void SetScope(string? distinguishedName)
+    {
+        if (string.IsNullOrEmpty(distinguishedName))
+        {
+            return;
+        }
+
+        ScopeDisplay = distinguishedName;
+        SearchEntireDomain = false;
+        UpdateBreadcrumbs(distinguishedName);
+    }
+
+    /// <summary>
+    /// Navigates the search scope to a breadcrumb segment.
+    /// </summary>
+    /// <param name="dn">The distinguished name to navigate to.</param>
+    [RelayCommand]
+    private void NavigateToBreadcrumb(string? dn)
+    {
+        if (!string.IsNullOrEmpty(dn))
+        {
+            SetScope(dn);
+        }
+    }
+
+    private void UpdateBreadcrumbs(string dn)
+    {
+        var segments = new ObservableCollection<BreadcrumbSegment>();
+        string remaining = dn;
+
+        while (!string.IsNullOrEmpty(remaining))
+        {
+            int commaIndex = remaining.IndexOf(',');
+            string label = commaIndex > 0 ? remaining[..commaIndex] : remaining;
+            segments.Add(new BreadcrumbSegment(label, remaining));
+
+            if (commaIndex < 0)
+            {
+                break;
+            }
+
+            remaining = remaining[(commaIndex + 1)..];
+        }
+
+        BreadcrumbSegments = segments;
+    }
 
     partial void OnSelectedObjectChanged(AdObject? value)
     {

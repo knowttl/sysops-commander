@@ -329,6 +329,58 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
     }
 
     /// <inheritdoc />
+    public async Task<AdSearchResult> SearchScopedAsync(
+        string searchTerm,
+        string? baseDn,
+        IReadOnlyList<string>? objectClasses,
+        string? attribute,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(searchTerm);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string sanitized = LdapFilterSanitizer.SanitizeInput(searchTerm);
+
+        // Build attribute filter
+        string attrFilter = string.IsNullOrEmpty(attribute)
+            ? $"(|(sAMAccountName=*{sanitized}*)(cn=*{sanitized}*)(displayName=*{sanitized}*)(mail=*{sanitized}*)(dNSHostName=*{sanitized}*))"
+            : $"({attribute}=*{sanitized}*)";
+
+        // Build object class filter
+        string classFilter = BuildObjectClassFilter(objectClasses);
+
+        // Combine filters
+        string filter = string.IsNullOrEmpty(classFilter)
+            ? attrFilter
+            : $"(&{classFilter}{attrFilter})";
+
+        string effectiveBaseDn = baseDn ?? GetActiveDomain().RootDistinguishedName;
+
+        return await ExecuteSearchAsync(filter, searchTerm, effectiveBaseDn, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<AdSearchResult> GetGroupMembersAsync(
+        string groupDn,
+        bool recursive,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(groupDn);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string sanitizedDn = LdapFilterSanitizer.SanitizeInput(groupDn);
+
+        // Direct: memberOf=groupDn; Recursive: memberOf with LDAP_MATCHING_RULE_IN_CHAIN OID
+        string filter = recursive
+            ? $"(memberOf:1.2.840.113556.1.4.1941:={sanitizedDn})"
+            : $"(memberOf={sanitizedDn})";
+
+        return await ExecuteSearchAsync(filter, $"Members of: {groupDn}", cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)
@@ -346,12 +398,21 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
         string queryLabel,
         CancellationToken cancellationToken)
     {
-        DomainConnection domain = GetActiveDomain();
+        string baseDn = GetActiveDomain().RootDistinguishedName;
+        return await ExecuteSearchAsync(filter, queryLabel, baseDn, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<AdSearchResult> ExecuteSearchAsync(
+        string filter,
+        string queryLabel,
+        string baseDn,
+        CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
 
         IReadOnlyList<Dictionary<string, object?>> results = await Task.Run(() =>
             _directoryAccessor.Search(
-                domain.RootDistinguishedName,
+                baseDn,
                 filter,
                 SearchProperties,
                 subtree: true,
@@ -411,6 +472,23 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
     private static string? GetStringAttribute(Dictionary<string, object?> properties, string name) =>
         properties.TryGetValue(name, out object? value) ? value?.ToString() : null;
+
+    private static string BuildObjectClassFilter(IReadOnlyList<string>? objectClasses)
+    {
+        if (objectClasses is null || objectClasses.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (objectClasses.Count == 1)
+        {
+            return $"(objectClass={LdapFilterSanitizer.SanitizeInput(objectClasses[0])})";
+        }
+
+        string orClauses = string.Concat(objectClasses.Select(c =>
+            $"(objectClass={LdapFilterSanitizer.SanitizeInput(c)})"));
+        return $"(|{orClauses})";
+    }
 
     private void ThrowIfDisposed() =>
         ObjectDisposedException.ThrowIf(_disposed, this);

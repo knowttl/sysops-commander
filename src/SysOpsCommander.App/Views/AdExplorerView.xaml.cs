@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using SysOpsCommander.ViewModels;
 
 namespace SysOpsCommander.App.Views;
@@ -12,6 +13,7 @@ public partial class AdExplorerView : UserControl
 {
     private GridLength _zone1ExpandedWidth = new(280);
     private GridLength _zone3ExpandedWidth = new(320);
+    private GridLength _savedZone1Width;
     private static readonly GridLength CollapsedWidth = new(40);
 
     /// <summary>
@@ -21,7 +23,11 @@ public partial class AdExplorerView : UserControl
     {
         InitializeComponent();
         AdTreeView.AddHandler(TreeViewItem.ExpandedEvent, new RoutedEventHandler(OnTreeViewItemExpanded));
+        AdTreeView.SelectedItemChanged += OnTreeViewSelectedItemChanged;
         DataContextChanged += OnDataContextChanged;
+
+        _ = InputBindings.Add(new KeyBinding(new RelayFocusCommand(SearchTextBox), Key.F, ModifierKeys.Control));
+        _ = InputBindings.Add(new KeyBinding(new RelayFocusCommand(TreeFilterTextBox), Key.L, ModifierKeys.Control));
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -46,6 +52,10 @@ public partial class AdExplorerView : UserControl
         else if (e.PropertyName == nameof(AdExplorerViewModel.IsZone3Collapsed))
         {
             UpdateZone3Width();
+        }
+        else if (e.PropertyName == nameof(AdExplorerViewModel.IsInspectorExpanded))
+        {
+            UpdateInspectorOverlay();
         }
     }
 
@@ -93,6 +103,41 @@ public partial class AdExplorerView : UserControl
         }
     }
 
+    private void UpdateInspectorOverlay()
+    {
+        if (DataContext is not AdExplorerViewModel vm)
+        {
+            return;
+        }
+
+        if (vm.IsInspectorExpanded)
+        {
+            _savedZone1Width = Zone1Column.Width;
+
+            Zone1Column.Width = new GridLength(0);
+            Zone1Column.MinWidth = 0;
+            Zone1Column.MaxWidth = 0;
+            Splitter1Column.Width = new GridLength(0);
+            Zone2Column.Width = new GridLength(0);
+            Splitter3Column.Width = new GridLength(0);
+            Zone3Column.Width = new GridLength(1, GridUnitType.Star);
+            Zone3Column.MinWidth = 0;
+            Zone3Column.MaxWidth = double.PositiveInfinity;
+        }
+        else
+        {
+            Zone1Column.MinWidth = 200;
+            Zone1Column.MaxWidth = 450;
+            Zone1Column.Width = _savedZone1Width;
+            Splitter1Column.Width = GridLength.Auto;
+            Zone2Column.Width = new GridLength(1, GridUnitType.Star);
+            Splitter3Column.Width = GridLength.Auto;
+            Zone3Column.MinWidth = 250;
+            Zone3Column.MaxWidth = 600;
+            Zone3Column.Width = _zone3ExpandedWidth;
+        }
+    }
+
     private void OnTreeViewItemExpanded(object sender, RoutedEventArgs e)
     {
         if (e.OriginalSource is TreeViewItem { DataContext: AdTreeNode node }
@@ -101,4 +146,26 @@ public partial class AdExplorerView : UserControl
             vm.ExpandNodeCommand.Execute(node);
         }
     }
+
+    private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (e.NewValue is AdTreeNode node && DataContext is AdExplorerViewModel vm)
+        {
+            vm.SetScopeCommand.Execute(node.DistinguishedName);
+        }
+    }
+}
+
+/// <summary>
+/// Simple ICommand that focuses a UIElement when executed.
+/// </summary>
+internal sealed class RelayFocusCommand(UIElement target) : ICommand
+{
+#pragma warning disable CS0067 // Required by ICommand interface
+    public event EventHandler? CanExecuteChanged;
+#pragma warning restore CS0067
+
+    public bool CanExecute(object? parameter) => true;
+
+    public void Execute(object? parameter) => target.Focus();
 }

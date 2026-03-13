@@ -13,6 +13,7 @@
     <UserControl.InputBindings>
         <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ToggleZone1Command}" />
         <KeyBinding Key="D3" Modifiers="Control" Command="{Binding ToggleZone3Command}" />
+        <KeyBinding Key="Escape" Command="{Binding CollapseInspectorCommand}" />
     </UserControl.InputBindings>
 
     <Grid>
@@ -26,7 +27,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="Zone1Column" Width="280" MinWidth="40" MaxWidth="450" />
                 <ColumnDefinition x:Name="Splitter1Column" Width="Auto" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="Zone2Column" Width="*" />
                 <ColumnDefinition x:Name="Splitter3Column" Width="Auto" />
                 <ColumnDefinition x:Name="Zone3Column" Width="320" MinWidth="40" MaxWidth="600" />
             </Grid.ColumnDefinitions>
@@ -40,6 +41,7 @@
                     <!-- Expanded content -->
                     <Grid Visibility="{Binding IsZone1Collapsed, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -79,11 +81,12 @@
                         </StackPanel>
                     </Button>
 
-                    <!-- Tree search/filter box (placeholder for Phase 5) -->
+                    <!-- Tree search/filter box -->
                     <TextBox Grid.Row="2"
                              Margin="6,4,6,4"
                              Style="{StaticResource ThemedTextBoxStyle}"
                              Text="{Binding TreeFilterText, UpdateSourceTrigger=PropertyChanged}"
+                             x:Name="TreeFilterTextBox"
                              AutomationProperties.Name="Filter OUs">
                         <TextBox.ToolTip>
                             <ToolTip Style="{StaticResource ThemedToolTipStyle}"
@@ -91,8 +94,51 @@
                         </TextBox.ToolTip>
                     </TextBox>
 
+                    <!-- Breadcrumb bar -->
+                    <ItemsControl Grid.Row="3"
+                                  ItemsSource="{Binding BreadcrumbSegments}"
+                                  Margin="6,0,6,4"
+                                  AutomationProperties.Name="Breadcrumb Navigation">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding BreadcrumbSegments.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="{Binding Label}"
+                                            Command="{Binding DataContext.NavigateToBreadcrumbCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding DistinguishedName}"
+                                            FontSize="10"
+                                            Padding="2,1"
+                                            Background="Transparent"
+                                            Foreground="{DynamicResource AccentBlueBrush}"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            ToolTip="{Binding DistinguishedName}" />
+                                    <TextBlock Text=" ›"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                               FontSize="10"
+                                               VerticalAlignment="Center"
+                                               Margin="2,0" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <!-- OU TreeView -->
-                    <TreeView Grid.Row="3"
+                    <TreeView Grid.Row="4"
                               ItemsSource="{Binding TreeNodes}"
                               AutomationProperties.Name="AD Object Tree"
                               x:Name="AdTreeView"
@@ -221,31 +267,143 @@
                                 AutomationProperties.Name="Get Domain Controllers" />
                     </StackPanel>
 
-                    <!-- Search bar -->
-                    <Grid Grid.Row="2" Margin="8,2,8,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource ThemedTextBoxStyle}"
-                                 AutomationProperties.Name="AD Search Box" />
-                        <Button Grid.Column="1"
-                                Command="{Binding SearchCommand}"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Margin="6,0,0,0"
-                                AutomationProperties.Name="Search Button">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE721;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="12"
+                    <!-- Advanced search bar -->
+                    <StackPanel Grid.Row="2" Margin="8,2,8,6">
+                        <!-- Row 1: Attribute selector + search input + button -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox Grid.Column="0"
+                                      ItemsSource="{Binding AttributeOptions}"
+                                      SelectedItem="{Binding SelectedAttribute}"
+                                      MinWidth="130"
+                                      Margin="0,0,6,0"
+                                      VerticalContentAlignment="Center"
+                                      AutomationProperties.Name="Attribute Filter" />
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ThemedTextBoxStyle}"
+                                     x:Name="SearchTextBox"
+                                     AutomationProperties.Name="AD Search Box" />
+                            <Button Grid.Column="2"
+                                    Command="{Binding SearchCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Margin="6,0,0,0"
+                                    AutomationProperties.Name="Search Button">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE721;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0" />
+                                    <TextBlock Text="Search" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Row 2: Object class filter pills -->
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <ToggleButton Content="All"
+                                          IsChecked="{Binding FilterAll}"
+                                          Command="{Binding ToggleFilterCommand}"
+                                          CommandParameter="All"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          Margin="0,0,4,0"
+                                          AutomationProperties.Name="Filter All" />
+                            <ToggleButton Content="&#xE77B; Users"
+                                          IsChecked="{Binding FilterUsers}"
+                                          Command="{Binding ToggleFilterCommand}"
+                                          CommandParameter="user"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          Margin="0,0,4,0"
+                                          AutomationProperties.Name="Filter Users" />
+                            <ToggleButton Content="&#xE7F8; Computers"
+                                          IsChecked="{Binding FilterComputers}"
+                                          Command="{Binding ToggleFilterCommand}"
+                                          CommandParameter="computer"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          Margin="0,0,4,0"
+                                          AutomationProperties.Name="Filter Computers" />
+                            <ToggleButton Content="&#xE716; Groups"
+                                          IsChecked="{Binding FilterGroups}"
+                                          Command="{Binding ToggleFilterCommand}"
+                                          CommandParameter="group"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          Margin="0,0,4,0"
+                                          AutomationProperties.Name="Filter Groups" />
+                            <ToggleButton Content="&#xED41; OUs"
+                                          IsChecked="{Binding FilterOus}"
+                                          Command="{Binding ToggleFilterCommand}"
+                                          CommandParameter="organizationalUnit"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          Margin="0,0,4,0"
+                                          AutomationProperties.Name="Filter OUs" />
+                            <ToggleButton Content="&#xE779; Contacts"
+                                          IsChecked="{Binding FilterContacts}"
+                                          Command="{Binding ToggleFilterCommand}"
+                                          CommandParameter="contact"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          AutomationProperties.Name="Filter Contacts" />
+                        </StackPanel>
+
+                        <!-- Row 3: Scope context line -->
+                        <DockPanel Margin="0,4,0,0">
+                            <CheckBox DockPanel.Dock="Right"
+                                      Content="Entire domain"
+                                      IsChecked="{Binding SearchEntireDomain}"
+                                      Foreground="{DynamicResource TextSecondaryBrush}"
+                                      FontSize="11"
+                                      VerticalContentAlignment="Center"
+                                      AutomationProperties.Name="Search Entire Domain" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Scope:"
+                                           Style="{StaticResource CaptionStyle}"
                                            VerticalAlignment="Center"
-                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Search" VerticalAlignment="Center" />
+                                           Margin="0,0,4,0" />
+                                <TextBlock VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource AccentBlueBrush}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding ScopeDisplay}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SearchEntireDomain}" Value="True">
+                                                    <Setter Property="Text" Value="Domain root" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Button Content="Reset"
+                                        Command="{Binding ResetScopeCommand}"
+                                        FontSize="11"
+                                        Padding="6,1"
+                                        Margin="6,0,0,0"
+                                        Background="Transparent"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        AutomationProperties.Name="Reset Scope">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ScopeDisplay}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ScopeDisplay}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                             </StackPanel>
-                        </Button>
-                    </Grid>
+                        </DockPanel>
+                    </StackPanel>
 
                     <!-- Search Results DataGrid -->
                     <Grid Grid.Row="3" Margin="4,0,4,0">
@@ -263,6 +421,20 @@
                                   BorderThickness="0"
                                   RowHeight="28"
                                   AutomationProperties.Name="AD Search Results">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu Style="{StaticResource ThemedContextMenuStyle}">
+                                    <MenuItem Header="Scope search to this OU"
+                                              Command="{Binding ScopeToSelectedOuCommand}"
+                                              AutomationProperties.Name="Scope To OU" />
+                                    <MenuItem Header="Show group members"
+                                              Command="{Binding ShowGroupMembersCommand}"
+                                              AutomationProperties.Name="Show Group Members" />
+                                    <Separator />
+                                    <MenuItem Header="Send computers to execution targets"
+                                              Command="{Binding SendToExecutionTargetsCommand}"
+                                              AutomationProperties.Name="Send To Targets" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
                                 <DataGridTextColumn Header="Class" Binding="{Binding ObjectClass}" Width="100" />
@@ -338,14 +510,22 @@
                                 <TextBlock Text="Detail Inspector"
                                            Style="{StaticResource PanelTitleStyle}"
                                            VerticalAlignment="Center" />
-                                <Button DockPanel.Dock="Right"
-                                        HorizontalAlignment="Right"
-                                        Command="{Binding ToggleZone3Command}"
-                                        Style="{StaticResource PanelChevronButtonStyle}"
-                                        AutomationProperties.Name="Collapse Detail Inspector"
-                                        ToolTip="Collapse (Ctrl+3)">
-                                    <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
-                                </Button>
+                                <StackPanel DockPanel.Dock="Right"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right">
+                                    <Button Command="{Binding ExpandInspectorCommand}"
+                                            Style="{StaticResource PanelChevronButtonStyle}"
+                                            AutomationProperties.Name="Expand Detail Inspector"
+                                            ToolTip="Expand to full width">
+                                        <TextBlock Text="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                                    </Button>
+                                    <Button Command="{Binding ToggleZone3Command}"
+                                            Style="{StaticResource PanelChevronButtonStyle}"
+                                            AutomationProperties.Name="Collapse Detail Inspector"
+                                            ToolTip="Collapse (Ctrl+3)">
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                                    </Button>
+                                </StackPanel>
                             </DockPanel>
                         </Border>
 
@@ -427,6 +607,7 @@
                                                 <Setter Property="FontSize" Value="11.5" />
                                                 <Setter Property="Padding" Value="4,2" />
                                                 <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                                <Setter Property="ToolTip" Value="{Binding Value}" />
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
@@ -437,18 +618,38 @@
                         <!-- Group Membership tab -->
                         <TabItem Header="Groups"
                                  AutomationProperties.Name="Group Membership Tab">
-                            <ListBox ItemsSource="{Binding SelectedObjectGroups}"
-                                     Background="Transparent"
-                                     BorderThickness="0"
-                                     AutomationProperties.Name="Group Membership List">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}"
-                                                   Style="{StaticResource BodyTextStyle}"
-                                                   Padding="4,3" />
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Top"
+                                        Content="Show all members"
+                                        Command="{Binding ShowGroupMembersCommand}"
+                                        Margin="4,4,4,2"
+                                        Padding="8,4"
+                                        HorizontalAlignment="Left"
+                                        AutomationProperties.Name="Show Group Members Button">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedObject.ObjectClass}" Value="group">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <ListBox ItemsSource="{Binding SelectedObjectGroups}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         AutomationProperties.Name="Group Membership List">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"
+                                                       Style="{StaticResource BodyTextStyle}"
+                                                       Padding="4,3" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
                         </TabItem>
 
                         <!-- Permissions tab (deferred) -->
