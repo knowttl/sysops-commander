@@ -24,7 +24,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
     private static readonly string[] BrowseProperties =
     [
-        "distinguishedName", "cn", "objectClass", "description"
+        "distinguishedName", "cn", "name", "ou", "objectClass", "description"
     ];
 
     private readonly IDirectoryAccessor _directoryAccessor;
@@ -439,7 +439,10 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
     {
         string dn = GetStringAttribute(properties, "distinguishedName") ?? string.Empty;
         string objectClass = ExtractObjectClass(properties);
-        string name = GetStringAttribute(properties, "cn") ?? dn;
+        string name = GetStringAttribute(properties, "name")
+                      ?? GetStringAttribute(properties, "cn")
+                      ?? GetStringAttribute(properties, "ou")
+                      ?? ExtractRdnValue(dn);
         string? displayName = GetStringAttribute(properties, "displayName");
 
         var attributes = new Dictionary<string, object?>(properties, StringComparer.OrdinalIgnoreCase);
@@ -472,6 +475,29 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
     private static string? GetStringAttribute(Dictionary<string, object?> properties, string name) =>
         properties.TryGetValue(name, out object? value) ? value?.ToString() : null;
+
+    /// <summary>
+    /// Extracts the value portion of the first RDN component from a DN.
+    /// E.g. "OU=Sales,DC=contoso,DC=com" → "Sales"
+    /// </summary>
+    private static string ExtractRdnValue(string dn)
+    {
+        if (string.IsNullOrEmpty(dn))
+        {
+            return dn;
+        }
+
+        int equalsIndex = dn.IndexOf('=');
+        if (equalsIndex < 0)
+        {
+            return dn;
+        }
+
+        int commaIndex = dn.IndexOf(',', equalsIndex);
+        return commaIndex > 0
+            ? dn[(equalsIndex + 1)..commaIndex]
+            : dn[(equalsIndex + 1)..];
+    }
 
     private static string BuildObjectClassFilter(IReadOnlyList<string>? objectClasses)
     {
