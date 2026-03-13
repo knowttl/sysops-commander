@@ -97,4 +97,29 @@ public interface IActiveDirectoryService
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A list of domain controller hostnames.</returns>
     Task<IReadOnlyList<string>> GetDomainControllersAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Searches for AD objects with scoping by base DN, object class filters, and attribute targeting.
+    /// </summary>
+    /// <param name="searchTerm">The search term to match.</param>
+    /// <param name="baseDn">The base distinguished name to scope the search, or <see langword="null"/> for domain root.</param>
+    /// <param name="objectClasses">Object class filters (e.g., "user", "computer"), or <see langword="null"/> for all classes.</param>
+    /// <param name="attribute">The specific attribute to search against, or <see langword="null"/> for default multi-attribute match.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The scoped search results.</returns>
+    Task<AdSearchResult> SearchScopedAsync(
+        string searchTerm,
+        string? baseDn,
+        IReadOnlyList<string>? objectClasses,
+        string? attribute,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets the members of a specified group.
+    /// </summary>
+    /// <param name="groupDn">The distinguished name of the group.</param>
+    /// <param name="recursive">Whether to include nested (transitive) members.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The search results containing group members.</returns>
+    Task<AdSearchResult> GetGroupMembersAsync(string groupDn, bool recursive, CancellationToken cancellationToken);
 }

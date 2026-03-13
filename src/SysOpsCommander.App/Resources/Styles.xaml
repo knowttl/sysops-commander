@@ -10,6 +10,8 @@
     <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />
     <converters:ObjectClassToIconConverter x:Key="ObjectClassToIconConverter" />
     <converters:ObjectClassToIconColorConverter x:Key="ObjectClassToIconColorConverter" />
+    <converters:RelativeTimeConverter x:Key="RelativeTimeConverter" />
+    <converters:TruncatedTextConverter x:Key="TruncatedTextConverter" />
 
     <!-- Navigation Button Style -->
     <Style x:Key="NavButtonStyle" TargetType="Button">

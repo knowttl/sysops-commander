@@ -117,7 +117,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
             ExecutionTime = TimeSpan.FromMilliseconds(42),
             Results = [new AdObject { Name = "Admin", DistinguishedName = "CN=Admin,DC=test,DC=local", ObjectClass = "user" }]
         };
-        _adService.SearchAsync("admin", Arg.Any<CancellationToken>()).Returns(result);
+        _adService.SearchScopedAsync("admin", Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(result);
 
         _viewModel.SearchText = "admin";
         await _viewModel.SearchCommand.ExecuteAsync(null);
@@ -133,13 +133,13 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _viewModel.SearchText = "";
         await _viewModel.SearchCommand.ExecuteAsync(null);
 
-        await _adService.DidNotReceive().SearchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _adService.DidNotReceive().SearchScopedAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Search_WhenFails_SetsErrorStatus()
     {
-        _adService.SearchAsync("fail", Arg.Any<CancellationToken>())
+        _adService.SearchScopedAsync("fail", Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("AD unreachable"));
 
         _viewModel.SearchText = "fail";
