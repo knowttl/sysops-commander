@@ -714,7 +714,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         {
             Task<AdObject> detailTask = _adService.GetObjectDetailAsync(dn, _cts.Token);
             Task<IReadOnlyList<string>> groupsTask = _adService.GetGroupMembershipAsync(
-                dn, recursive: true, _cts.Token);
+                dn, recursive: false, _cts.Token);
             await Task.WhenAll(detailTask, groupsTask);
 
             SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
@@ -722,7 +722,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                     .OrderBy(a => a.Key)
                     .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
 
-            SelectedObjectGroups = new ObservableCollection<string>(groupsTask.Result);
+            SelectedObjectGroups = new ObservableCollection<string>(
+                groupsTask.Result.Distinct(StringComparer.OrdinalIgnoreCase));
         }
         catch (OperationCanceledException)
         {
