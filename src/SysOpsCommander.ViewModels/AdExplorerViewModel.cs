@@ -52,6 +52,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [ObservableProperty]
     private string _resultStatus = string.Empty;
 
+    [ObservableProperty]
+    private string _treeFilterText = string.Empty;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AdExplorerViewModel"/> class.
     /// </summary>
