@@ -27,6 +27,14 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private object? _currentView;
 
+    partial void OnCurrentViewChanged(object? value)
+    {
+        if (value is IRefreshable refreshable)
+        {
+            _ = refreshable.RefreshAsync();
+        }
+    }
+
     [ObservableProperty]
     private string _currentDomainName = string.Empty;
 

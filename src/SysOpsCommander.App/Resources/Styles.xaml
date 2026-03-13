@@ -8,6 +8,8 @@
     <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
     <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
     <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />
+    <converters:ObjectClassToIconConverter x:Key="ObjectClassToIconConverter" />
+    <converters:ObjectClassToIconColorConverter x:Key="ObjectClassToIconColorConverter" />
 
     <!-- Navigation Button Style -->
     <Style x:Key="NavButtonStyle" TargetType="Button">

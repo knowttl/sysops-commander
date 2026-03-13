@@ -234,9 +234,10 @@ public sealed class MainWindowViewModelTests
         IRefreshable refreshable = Substitute.For<IRefreshable>();
         _viewModel.CurrentView = refreshable;
 
+        // CurrentView setter auto-calls RefreshAsync once, then the explicit command calls it again
         await _viewModel.RefreshCurrentViewCommand.ExecuteAsync(null);
 
-        await refreshable.Received(1).RefreshAsync();
+        await refreshable.Received(2).RefreshAsync();
     }
 
     [Fact]

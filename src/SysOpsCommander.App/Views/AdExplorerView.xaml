@@ -32,6 +32,7 @@
                         BorderThickness="1" CornerRadius="4"
                         Padding="8,4" Margin="12,0,0,0"
                         VerticalAlignment="Center"
+                        Visibility="{Binding ActiveDomainDisplay, Converter={StaticResource StringToVisibilityConverter}}"
                         AutomationProperties.Name="Active Domain Badge">
                     <TextBlock Text="{Binding ActiveDomainDisplay}"
                                FontWeight="SemiBold"
@@ -102,27 +103,50 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Button Grid.Row="0" Content="Load Tree"
+                    <Button Grid.Row="0"
                             Command="{Binding LoadTreeRootCommand}"
                             HorizontalAlignment="Stretch"
                             Margin="0,0,0,4"
                             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                            AutomationProperties.Name="Load AD Tree" />
+                            AutomationProperties.Name="Load AD Tree">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE774;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="14"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="Load Tree"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <TreeView Grid.Row="1"
                               ItemsSource="{Binding TreeNodes}"
                               AutomationProperties.Name="AD Object Tree"
                               x:Name="AdTreeView"
                               VirtualizingStackPanel.IsVirtualizing="True"
-                              VirtualizingStackPanel.VirtualizationMode="Recycling">
+                              VirtualizingStackPanel.VirtualizationMode="Recycling"
+                              Background="Transparent"
+                              BorderThickness="0">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Margin="2,1">
+                                    <TextBlock Text="{Binding ObjectClass, Converter={StaticResource ObjectClassToIconConverter}}"
+                                               Foreground="{Binding ObjectClass, Converter={StaticResource ObjectClassToIconColorConverter}}"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="16"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                               FontSize="13"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="TreeViewItem">
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                <Setter Property="Padding" Value="4,2" />
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>
