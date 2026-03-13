@@ -14,6 +14,7 @@ public sealed class MainWindowViewModelTests
 {
     private readonly IActiveDirectoryService _adService = Substitute.For<IActiveDirectoryService>();
     private readonly IDialogService _dialogService = Substitute.For<IDialogService>();
+    private readonly IAutoUpdateService _autoUpdateService = Substitute.For<IAutoUpdateService>();
     private readonly IServiceProvider _serviceProvider;
     private readonly MainWindowViewModel _viewModel;
 
@@ -29,6 +30,7 @@ public sealed class MainWindowViewModelTests
         services.AddSingleton(Substitute.For<IScriptLoaderService>());
         services.AddSingleton(Substitute.For<IExportService>());
         services.AddSingleton(_dialogService);
+        services.AddSingleton(_autoUpdateService);
         services.AddSingleton(Substitute.For<ILogger>());
 
         services.AddTransient<DashboardViewModel>();
@@ -52,7 +54,7 @@ public sealed class MainWindowViewModelTests
                 RootDistinguishedName = "DC=test,DC=local"
             }]);
 
-        _viewModel = new MainWindowViewModel(_serviceProvider, _adService, _dialogService);
+        _viewModel = new MainWindowViewModel(_serviceProvider, _adService, _dialogService, _autoUpdateService);
     }
 
     [Fact]
@@ -127,7 +129,7 @@ public sealed class MainWindowViewModelTests
 
         await _viewModel.InitializeAsync();
 
-        _viewModel.CurrentDomainName.Should().Be("Unknown");
+        _viewModel.CurrentDomainName.Should().Be(Environment.UserDomainName);
         _viewModel.ConnectionStatus.Should().Be("Disconnected");
     }
 
@@ -250,7 +252,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Constructor_ThrowsOnNullServiceProvider()
     {
-        Action act = () => _ = new MainWindowViewModel(null!, _adService, _dialogService);
+        Action act = () => _ = new MainWindowViewModel(null!, _adService, _dialogService, _autoUpdateService);
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -258,7 +260,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Constructor_ThrowsOnNullAdService()
     {
-        Action act = () => _ = new MainWindowViewModel(_serviceProvider, null!, _dialogService);
+        Action act = () => _ = new MainWindowViewModel(_serviceProvider, null!, _dialogService, _autoUpdateService);
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -266,7 +268,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Constructor_ThrowsOnNullDialogService()
     {
-        Action act = () => _ = new MainWindowViewModel(_serviceProvider, _adService, null!);
+        Action act = () => _ = new MainWindowViewModel(_serviceProvider, _adService, null!, _autoUpdateService);
 
         act.Should().Throw<ArgumentNullException>();
     }

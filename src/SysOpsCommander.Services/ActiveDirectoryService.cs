@@ -78,9 +78,22 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
             }
             catch (Exception ex)
             {
-                _logger.Warning(ex, "Forest enumeration failed, returning current domain only");
+                _logger.Warning(ex, "Forest enumeration failed, falling back to environment domain name");
 
-                (string fallbackDomainName, string fallbackRootDn) = _directoryAccessor.GetCurrentDomain();
+                string fallbackDomainName = Environment.UserDomainName;
+                string fallbackRootDn = "DC=" + fallbackDomainName.Replace(".", ",DC=", StringComparison.Ordinal);
+
+                try
+                {
+                    (string detectedName, string detectedRootDn) = _directoryAccessor.GetCurrentDomain();
+                    fallbackDomainName = detectedName;
+                    fallbackRootDn = detectedRootDn;
+                }
+                catch (Exception innerEx)
+                {
+                    _logger.Warning(innerEx, "GetCurrentDomain also failed, using Environment.UserDomainName");
+                }
+
                 return (IReadOnlyList<DomainConnection>)
                 [
                     new DomainConnection
@@ -133,15 +146,32 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
             return _activeDomain;
         }
 
-        (string domainName, string rootDn) = _directoryAccessor.GetCurrentDomain();
-        _activeDomain = new DomainConnection
+        try
         {
-            DomainName = domainName,
-            RootDistinguishedName = rootDn,
-            IsCurrentDomain = true
-        };
+            (string domainName, string rootDn) = _directoryAccessor.GetCurrentDomain();
+            _activeDomain = new DomainConnection
+            {
+                DomainName = domainName,
+                RootDistinguishedName = rootDn,
+                IsCurrentDomain = true
+            };
 
-        _logger.Information("Initialized AD service for domain {DomainName}", _activeDomain.DomainName);
+            _logger.Information("Initialized AD service for domain {DomainName}", _activeDomain.DomainName);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "DirectoryAccessor.GetCurrentDomain failed, using Environment.UserDomainName fallback");
+
+            string fallbackName = Environment.UserDomainName;
+            string fallbackRootDn = "DC=" + fallbackName.Replace(".", ",DC=", StringComparison.Ordinal);
+            _activeDomain = new DomainConnection
+            {
+                DomainName = fallbackName,
+                RootDistinguishedName = fallbackRootDn,
+                IsCurrentDomain = true
+            };
+        }
+
         return _activeDomain;
     }
 

@@ -3,11 +3,200 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:enums="clr-namespace:SysOpsCommander.Core.Enums;assembly=SysOpsCommander.Core"
+             xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
-             AutomationProperties.Name="Audit Log View">
+             d:DesignHeight="750" d:DesignWidth="1200"
+             d:DataContext="{d:DesignInstance Type=vm:AuditLogViewModel}"
+             AutomationProperties.Name="Audit Log View"
+             Loaded="OnLoaded">
+
+    <UserControl.Resources>
+        <ObjectDataProvider x:Key="AuthMethods"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="enums:WinRmAuthMethod" />
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+    </UserControl.Resources>
+
     <Grid>
-        <TextBlock Text="Audit Log — Coming in Phase 9"
-                   Style="{StaticResource PlaceholderTextStyle}" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="200" MinHeight="80" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="Audit Log"
+                   Style="{StaticResource SectionHeaderStyle}"
+                   Margin="0,0,0,8" />
+
+        <!-- Filters Panel -->
+        <Border Grid.Row="1"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="1" CornerRadius="4"
+                Padding="12" Margin="0,0,0,8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 1: Date range + Script -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Date:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <DatePicker SelectedDate="{Binding FilterStartDate}"
+                                Width="130" Margin="0,0,6,0"
+                                AutomationProperties.Name="Filter Start Date" />
+                    <TextBlock Text="to" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <DatePicker SelectedDate="{Binding FilterEndDate}"
+                                Width="130" Margin="0,0,16,0"
+                                AutomationProperties.Name="Filter End Date" />
+                    <TextBlock Text="Script:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding FilterScriptName, UpdateSourceTrigger=PropertyChanged}"
+                             Width="160" Margin="0,0,16,0"
+                             AutomationProperties.Name="Filter Script Name" />
+                </StackPanel>
+
+                <!-- Row 2: Host + Domain + Auth + User -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Host:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding FilterHostname, UpdateSourceTrigger=PropertyChanged}"
+                             Width="140" Margin="0,0,16,0"
+                             AutomationProperties.Name="Filter Hostname" />
+                    <TextBlock Text="Domain:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding FilterDomain, UpdateSourceTrigger=PropertyChanged}"
+                             Width="140" Margin="0,0,16,0"
+                             AutomationProperties.Name="Filter Domain" />
+                    <TextBlock Text="Auth:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding Source={StaticResource AuthMethods}}"
+                              SelectedItem="{Binding FilterAuthMethod}"
+                              Width="110" Margin="0,0,16,0"
+                              AutomationProperties.Name="Filter Auth Method" />
+                    <TextBlock Text="User:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding FilterUserName, UpdateSourceTrigger=PropertyChanged}"
+                             Width="140"
+                             AutomationProperties.Name="Filter User Name" />
+                </StackPanel>
+
+                <!-- Row 3: Apply / Clear -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal">
+                    <Button Content="Apply Filters"
+                            Command="{Binding LoadAuditLogCommand}"
+                            Margin="0,0,8,0"
+                            AutomationProperties.Name="Apply Filters Button" />
+                    <Button Content="Clear Filters"
+                            Command="{Binding ClearFiltersCommand}"
+                            AutomationProperties.Name="Clear Filters Button" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="2"
+                  ItemsSource="{Binding AuditEntries}"
+                  SelectedItem="{Binding SelectedEntry}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  CanUserSortColumns="True"
+                  VirtualizingStackPanel.IsVirtualizing="True"
+                  AlternatingRowBackground="{DynamicResource ControlFillColorDefaultBrush}"
+                  AutomationProperties.Name="Audit Log Data Grid">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Date" Binding="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Width="130" />
+                <DataGridTextColumn Header="Script" Binding="{Binding ScriptName}" Width="180" />
+                <DataGridTextColumn Header="Hosts" Binding="{Binding TargetHostCount}" Width="55" />
+                <DataGridTextColumn Header="OK" Binding="{Binding SuccessCount}" Width="45" />
+                <DataGridTextColumn Header="Fail" Binding="{Binding FailureCount}" Width="45" />
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="90" />
+                <DataGridTextColumn Header="Auth" Binding="{Binding AuthMethod}" Width="75" />
+                <DataGridTextColumn Header="Transport" Binding="{Binding Transport}" Width="75" />
+                <DataGridTextColumn Header="Domain" Binding="{Binding TargetDomain}" Width="110" />
+                <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="100" />
+                <DataGridTextColumn Header="Duration" Binding="{Binding Duration, StringFormat='{}{0:mm\\:ss\\.f}'}" Width="70" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Pagination -->
+        <Grid Grid.Row="3" Margin="0,8,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Page" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding CurrentPage}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <TextBlock Text=" of " VerticalAlignment="Center" />
+                <TextBlock Text="{Binding TotalPages}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <TextBlock Text="  |  Total:" VerticalAlignment="Center" Margin="8,0,6,0" />
+                <TextBlock Text="{Binding TotalEntries}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <TextBlock Text=" entries" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="◁ Prev"
+                        Command="{Binding PreviousPageCommand}"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Previous Page Button" />
+                <Button Content="Next ▷"
+                        Command="{Binding NextPageCommand}"
+                        AutomationProperties.Name="Next Page Button" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Actions -->
+        <Grid Grid.Row="4" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" Content="Export"
+                    Command="{Binding ExportAuditLogCommand}"
+                    Margin="0,0,8,0"
+                    AutomationProperties.Name="Export Audit Log Button" />
+            <Button Grid.Column="1" Content="Purge Old Entries"
+                    Command="{Binding PurgeOldEntriesCommand}"
+                    AutomationProperties.Name="Purge Old Entries Button" />
+            <TextBlock Grid.Column="3" Text="{Binding StatusMessage}"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Grid>
+
+        <!-- Detail Panel -->
+        <Border Grid.Row="5"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="1" CornerRadius="4"
+                Padding="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Entry Detail"
+                           FontWeight="SemiBold" Margin="0,0,0,4" />
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <TextBox Text="{Binding SelectedEntryDetail, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontFamily="Consolas"
+                             TextWrapping="Wrap"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             AutomationProperties.Name="Audit Entry Detail" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

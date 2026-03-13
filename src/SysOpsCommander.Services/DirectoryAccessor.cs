@@ -16,25 +16,51 @@ public sealed class DirectoryAccessor : IDirectoryAccessor
     /// <inheritdoc />
     public (string DomainName, string RootDn) GetCurrentDomain()
     {
-        using var domain = Domain.GetCurrentDomain();
-        string rootDn = ConvertDomainNameToRootDn(domain.Name);
-        return (domain.Name, rootDn);
+        try
+        {
+            using var domain = Domain.GetCurrentDomain();
+            string rootDn = ConvertDomainNameToRootDn(domain.Name);
+            return (domain.Name, rootDn);
+        }
+        catch (ActiveDirectoryObjectNotFoundException ex)
+        {
+            throw new InvalidOperationException(
+                "No Active Directory domain found for the current user. Verify the machine is domain-joined.", ex);
+        }
+        catch (ActiveDirectoryOperationException ex)
+        {
+            throw new InvalidOperationException(
+                "Active Directory domain detection failed. A domain controller may be unreachable.", ex);
+        }
     }
 
     /// <inheritdoc />
     public IReadOnlyList<(string DomainName, string RootDn)> GetForestDomains()
     {
-        using var forest = Forest.GetCurrentForest();
-        var domains = new List<(string, string)>();
-
-        foreach (Domain domain in forest.Domains)
+        try
         {
-            string rootDn = ConvertDomainNameToRootDn(domain.Name);
-            domains.Add((domain.Name, rootDn));
-            domain.Dispose();
-        }
+            using var forest = Forest.GetCurrentForest();
+            var domains = new List<(string, string)>();
 
-        return domains;
+            foreach (Domain domain in forest.Domains)
+            {
+                string rootDn = ConvertDomainNameToRootDn(domain.Name);
+                domains.Add((domain.Name, rootDn));
+                domain.Dispose();
+            }
+
+            return domains;
+        }
+        catch (ActiveDirectoryObjectNotFoundException ex)
+        {
+            throw new InvalidOperationException(
+                "No Active Directory forest found for the current user. Verify the machine is domain-joined.", ex);
+        }
+        catch (ActiveDirectoryOperationException ex)
+        {
+            throw new InvalidOperationException(
+                "Active Directory forest enumeration failed. A domain controller may be unreachable.", ex);
+        }
     }
 
     /// <inheritdoc />

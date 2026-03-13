@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using SysOpsCommander.ViewModels;
 
 namespace SysOpsCommander.App.Views;
 
@@ -13,5 +15,13 @@ public partial class AuditLogView : UserControl
     public AuditLogView()
     {
         InitializeComponent();
+    }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is AuditLogViewModel vm)
+        {
+            await vm.LoadAuditLogCommand.ExecuteAsync(null);
+        }
     }
 }

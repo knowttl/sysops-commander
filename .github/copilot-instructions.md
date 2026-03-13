@@ -136,6 +136,38 @@ Solution structure, 6 projects, NuGet packages, build configuration (`TreatWarni
 - `[SupportedOSPlatform("windows")]` on all AD classes (Services targets `net8.0`, not `net8.0-windows`)
 - 123 total tests passing (37 new AD tests)
 
+### Phase 4 — Remote Execution Engine ✅
+- `PowerShellRemoteStrategy` — WinRM remote execution via `WSManConnectionInfo` with configurable auth (Kerberos/NTLM/CredSSP), transport (HTTP/HTTPS), port, `AddParameter()` injection, auth-specific error mapping
+- `WmiQueryStrategy` — WMI/DCOM remote query execution with `ManagementScope`, `ConnectionOptions`, result formatting
+- `RemoteExecutionService` — orchestrates multi-host execution with pre-flight TCP reachability checks, parallel throttled execution via `Parallel.ForEachAsync`, progress reporting, audit logging, cancellation support via `ConcurrentDictionary<Guid, CTS>`
+- `CredentialService` — credential acquisition, LDAP-bind validation, secure disposal; never logs credential values
+- `HostTargetingService` — singleton `ObservableCollection<HostTarget>` shared across views, hostname validation, de-duplication, CSV import, AD search import, TCP reachability checks
+- `NotificationService` — Windows toast notifications via `Microsoft.Toolkit.Uwp.Notifications` for execution events
+- `AuditLogService` — delegates to `IAuditLogRepository` for execution history persistence, supports query and purge
+- Tests: `RemoteExecutionServiceTests`, `PowerShellRemoteStrategyTests`, `CredentialServiceTests`, `HostTargetingServiceTests`, `ExportServiceTests`
+
+### Phase 5 — Script Plugin System ✅
+- `ScriptFileProvider` — discovers `.ps1` files from configured directories (three-tier settings hierarchy: per-user → org-wide → built-in `scripts/examples/`), pairs with `.json` manifests, handles `UnauthorizedAccessException`/`DirectoryNotFoundException` gracefully
+- `ScriptLoaderService` — loads, validates, and caches `ScriptPlugin` objects; manifest deserialization + `ManifestSchemaValidator` + `ScriptValidationService` integration (syntax, dangerous patterns, manifest-pair validation); `RefreshAsync` with `LibraryChanged` event
+- `ExportService` — CSV export via CsvHelper, Excel export via ClosedXML (host results + audit log entries), formatted headers and auto-sized columns
+- 5 sample scripts with 4 manifests in `scripts/examples/` (Get-InstalledSoftware, Get-LocalAdmins, Get-SecurityEventLog, Test-WinRMConnectivity, Invoke-QuickScan)
+- Tests: `ScriptLoaderServiceTests`, `ExportServiceTests`
+
+### Phase 6 — UI Shell & Navigation ✅
+- `MainWindow.xaml` — FluentWindow with custom TitleBar, 220px sidebar navigation (Dashboard, AD Explorer, Execution, Script Library, Audit Log, Settings), `ContentControl` content area, status bar with domain selector, user info, connection status
+- `MainWindowViewModel` — `NavigateCommand` with view name parameter, `InitializeAsync` (domain detection, dashboard default), keyboard shortcuts (Ctrl+F, Ctrl+E, Ctrl+D, F5, Escape), `IRefreshable` support, domain switching, `IDialogService` integration
+- View↔ViewModel DataTemplate mappings in resources — auto-selects correct view for each ViewModel
+- 6 views: `DashboardView`, `AdExplorerView`, `ExecutionView`, `ScriptLibraryView`, `AuditLogView`, `SettingsView`
+- Converters: `BoolToVisibilityConverter`, `StatusToColorConverter`
+- Dialogs: `CredentialDialog`, `DomainSelectorDialog` with `DialogService` for MVVM-safe interaction
+- 232 total tests passing
+
+### Phase 7 — AD Explorer & Dashboard Views ✅
+- `AdExplorerViewModel` — tree browse, search with debounce, security filters, object detail, `IRefreshable`/`IDisposable`
+- `DashboardViewModel` — Quick Connect, recent executions, domain info, `IRefreshable`/`IDisposable`
+- `AdExplorerView.xaml` — 3-panel layout with TreeView, DataGrid, detail panel
+- `DashboardView.xaml` — welcome section, Quick Connect, recent executions
+
 ### Known Analyzer Behaviors
 - **IDE0046**: Extremely aggressive — requires ALL cascading `if (...) return X;` before a final return to be folded into nested ternary chains
 - **IDE0007/IDE0008**: `var` only when type is apparent from `new`/factory; explicit type for method returns

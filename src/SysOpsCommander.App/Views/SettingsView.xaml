@@ -3,11 +3,247 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:enums="clr-namespace:SysOpsCommander.Core.Enums;assembly=SysOpsCommander.Core"
+             xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
-             AutomationProperties.Name="Settings View">
+             d:DesignHeight="750" d:DesignWidth="900"
+             d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
+             AutomationProperties.Name="Settings View"
+             Loaded="OnLoaded">
+    <UserControl.Resources>
+        <ObjectDataProvider x:Key="AuthMethods"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="enums:WinRmAuthMethod" />
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+        <ObjectDataProvider x:Key="TransportTypes"
+                            MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="enums:WinRmTransport" />
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+    </UserControl.Resources>
+
     <Grid>
-        <TextBlock Text="Settings — Coming in Phase 9"
-                   Style="{StaticResource PlaceholderTextStyle}" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header with Save/Reset -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <TextBlock Text="Settings"
+                           Style="{StaticResource SectionHeaderStyle}" />
+                <TextBlock Text=" *" FontSize="18" FontWeight="SemiBold"
+                           Foreground="#F39C12"
+                           Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="Save" Margin="0,0,8,0"
+                    Command="{Binding SaveSettingsCommand}"
+                    AutomationProperties.Name="Save Settings Button" />
+            <Button Grid.Column="2" Content="Reset"
+                    Command="{Binding ResetSettingsCommand}"
+                    AutomationProperties.Name="Reset Settings Button" />
+        </Grid>
+
+        <!-- Scrollable Settings Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+            <StackPanel>
+
+                <!-- Domain & Connection Section -->
+                <TextBlock Text="Domain &amp; Connection" FontWeight="SemiBold" FontSize="14"
+                           Margin="0,0,0,8" />
+                <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Default Domain:"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
+                            <TextBox Text="{Binding DefaultDomain, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="Default Domain Input" />
+                            <TextBlock Text="{Binding OrgDefaultDomain, StringFormat='(org default: {0})'}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Visibility="{Binding OrgDefaultDomain, Converter={StaticResource StringToVisibilityConverter}}"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="WinRM Auth:"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <ComboBox Grid.Row="1" Grid.Column="1"
+                                  ItemsSource="{Binding Source={StaticResource AuthMethods}}"
+                                  SelectedItem="{Binding DefaultAuthMethod}"
+                                  HorizontalAlignment="Left" Width="160" Margin="0,0,0,8"
+                                  AutomationProperties.Name="Default Auth Method" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="WinRM Transport:"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  ItemsSource="{Binding Source={StaticResource TransportTypes}}"
+                                  SelectedItem="{Binding DefaultTransport}"
+                                  HorizontalAlignment="Left" Width="160" Margin="0,0,0,8"
+                                  AutomationProperties.Name="Default Transport" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Stale Threshold (days):"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBox Grid.Row="3" Grid.Column="1"
+                                 Text="{Binding StaleComputerThresholdDays, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left" Width="80" Margin="0,0,0,8"
+                                 AutomationProperties.Name="Stale Threshold Days" />
+                    </Grid>
+                </Border>
+
+                <!-- Execution Section -->
+                <TextBlock Text="Execution" FontWeight="SemiBold" FontSize="14"
+                           Margin="0,0,0,8" />
+                <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Default Throttle:"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding DefaultThrottle, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left" Width="80" Margin="0,0,0,8"
+                                 AutomationProperties.Name="Default Throttle" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Default Timeout (sec):"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding DefaultTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left" Width="80" Margin="0,0,0,8"
+                                 AutomationProperties.Name="Default Timeout Seconds" />
+                    </Grid>
+                </Border>
+
+                <!-- Script Repository Section -->
+                <TextBlock Text="Script Repository" FontWeight="SemiBold" FontSize="14"
+                           Margin="0,0,0,8" />
+                <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="Org-wide path:" Width="180" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding OrgScriptRepositoryPath}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <CheckBox Content="Override with custom path"
+                                  IsChecked="{Binding HasUserScriptPathOverride}"
+                                  Margin="0,0,0,8"
+                                  AutomationProperties.Name="Override Script Path Checkbox" />
+
+                        <TextBox Text="{Binding UserScriptRepositoryPath, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding HasUserScriptPathOverride}"
+                                 Margin="180,0,0,0"
+                                 AutomationProperties.Name="User Script Repository Path" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Logging Section -->
+                <TextBlock Text="Logging" FontWeight="SemiBold" FontSize="14"
+                           Margin="0,0,0,8" />
+                <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="Log Level:"
+                                   VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1"
+                                  SelectedItem="{Binding LogLevel}"
+                                  HorizontalAlignment="Left" Width="160"
+                                  AutomationProperties.Name="Log Level Selector">
+                            <ComboBoxItem Content="Verbose" />
+                            <ComboBoxItem Content="Debug" />
+                            <ComboBoxItem Content="Information" />
+                            <ComboBoxItem Content="Warning" />
+                            <ComboBoxItem Content="Error" />
+                            <ComboBoxItem Content="Fatal" />
+                        </ComboBox>
+                    </Grid>
+                </Border>
+
+                <!-- Updates Section -->
+                <TextBlock Text="Updates" FontWeight="SemiBold" FontSize="14"
+                           Margin="0,0,0,8" />
+                <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Current Version:"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   Text="{Binding CurrentVersion}"
+                                   VerticalAlignment="Center" FontWeight="SemiBold"
+                                   Margin="0,0,0,8" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Update Share:"
+                                   VerticalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding UpdateSharePath, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,8"
+                                 AutomationProperties.Name="Update Share Path" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Status:"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="2" Grid.Column="1"
+                                   Text="{Binding UpdateStatus}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Status Bar -->
+        <TextBlock Grid.Row="2" Text="{Binding StatusMessage}"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,8,0,0" />
     </Grid>
 </UserControl>

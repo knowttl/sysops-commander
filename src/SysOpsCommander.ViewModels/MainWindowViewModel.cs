@@ -17,7 +17,9 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IServiceProvider _serviceProvider;
     private readonly IActiveDirectoryService _adService;
     private readonly IDialogService _dialogService;
+    private readonly IAutoUpdateService _autoUpdateService;
     private CancellationTokenSource? _globalCancellationSource;
+    private bool _isInitializing;
 
     [ObservableProperty]
     private string _title = AppConstants.AppName;
@@ -55,18 +57,22 @@ public partial class MainWindowViewModel : ObservableObject
     /// <param name="serviceProvider">The service provider for resolving child ViewModels.</param>
     /// <param name="adService">The Active Directory service.</param>
     /// <param name="dialogService">The dialog service for MVVM-safe dialog interactions.</param>
+    /// <param name="autoUpdateService">The auto-update service for checking for new versions.</param>
     public MainWindowViewModel(
         IServiceProvider serviceProvider,
         IActiveDirectoryService adService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IAutoUpdateService autoUpdateService)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
         ArgumentNullException.ThrowIfNull(adService);
         ArgumentNullException.ThrowIfNull(dialogService);
+        ArgumentNullException.ThrowIfNull(autoUpdateService);
 
         _serviceProvider = serviceProvider;
         _adService = adService;
         _dialogService = dialogService;
+        _autoUpdateService = autoUpdateService;
     }
 
     /// <summary>
@@ -77,21 +83,33 @@ public partial class MainWindowViewModel : ObservableObject
     {
         CurrentUserName = Environment.UserName;
 
+        // Use Environment.UserDomainName as an instant fallback — Domain.GetCurrentDomain() can hang
+        CurrentDomainName = Environment.UserDomainName;
+        ConnectionStatus = "Connecting";
+
         try
         {
-            DomainConnection activeDomain = _adService.GetActiveDomain();
+            using CancellationTokenSource domainCts = new(TimeSpan.FromSeconds(10));
+            DomainConnection activeDomain = await Task.Run(
+                _adService.GetActiveDomain, domainCts.Token).ConfigureAwait(false);
             CurrentDomainName = activeDomain.DomainName;
             ConnectionStatus = "Connected";
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Warning("AD domain detection timed out — using Environment.UserDomainName fallback");
+            ConnectionStatus = "Disconnected";
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Could not detect active AD domain on startup");
-            CurrentDomainName = "Unknown";
             ConnectionStatus = "Disconnected";
         }
 
-        await LoadAvailableDomainsAsync();
         NavigateToDashboard();
+        await LoadAvailableDomainsAsync();
+
+        _ = CheckForUpdatesInBackgroundAsync();
     }
 
     /// <summary>
@@ -214,7 +232,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedDomainChanged(DomainConnection? value)
     {
-        if (value is not null)
+        if (value is not null && !_isInitializing)
         {
             _ = SwitchDomainAsync(value);
         }
@@ -250,12 +268,44 @@ public partial class MainWindowViewModel : ObservableObject
     {
         try
         {
-            IReadOnlyList<DomainConnection> domains = await _adService.GetAvailableDomainsAsync(CancellationToken.None);
+            using CancellationTokenSource timeoutCts = new(TimeSpan.FromSeconds(10));
+            IReadOnlyList<DomainConnection> domains = await _adService.GetAvailableDomainsAsync(timeoutCts.Token);
             AvailableDomains = new ObservableCollection<DomainConnection>(domains);
+
+            _isInitializing = true;
+            DomainConnection? current = null;
+            foreach (DomainConnection d in domains)
+            {
+                if (d.IsCurrentDomain)
+                {
+                    current = d;
+                    break;
+                }
+            }
+
+            SelectedDomain = current ?? (domains.Count > 0 ? domains[0] : null);
+            _isInitializing = false;
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Could not load available domains");
+        }
+    }
+
+    private async Task CheckForUpdatesInBackgroundAsync()
+    {
+        try
+        {
+            UpdateCheckResult result = await _autoUpdateService.CheckForUpdateAsync(CancellationToken.None);
+            if (result.IsUpdateAvailable)
+            {
+                IsUpdateAvailable = true;
+                Log.Information("Update available: {Version}", result.LatestVersion);
+            }
+        }
+        catch
+        {
+            // Update check failure is never blocking
         }
     }
 }
