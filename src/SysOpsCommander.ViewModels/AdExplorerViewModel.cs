@@ -63,6 +63,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private string _treeFilterText = string.Empty;
 
     [ObservableProperty]
+    private ObservableCollection<AdTreeNode> _filteredTreeNodes = [];
+
+    [ObservableProperty]
     private bool _isZone1Collapsed;
 
     [ObservableProperty]
@@ -250,7 +253,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             TreeNodes = new ObservableCollection<AdTreeNode>(
                 rootChildren
                     .Where(IsNavigableTreeObject)
+                    .OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(MapToTreeNode));
+
+            ApplyTreeFilter();
         }
         catch (OperationCanceledException)
         {
@@ -284,7 +290,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             IReadOnlyList<AdObject> children = await _adService.BrowseChildrenAsync(
                 node.DistinguishedName, _cts.Token);
 
-            foreach (AdObject child in children.Where(IsNavigableTreeObject))
+            foreach (AdObject child in children
+                         .Where(IsNavigableTreeObject)
+                         .OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
             {
                 AdTreeNode childNode = MapToTreeNode(child);
                 node.Children.Add(childNode);
@@ -791,6 +799,69 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
     private static bool IsNavigableTreeObject(AdObject obj) =>
         NavigableObjectClasses.Contains(obj.ObjectClass);
+
+    partial void OnTreeFilterTextChanged(string value) => ApplyTreeFilter();
+
+    private void ApplyTreeFilter()
+    {
+        if (string.IsNullOrWhiteSpace(TreeFilterText))
+        {
+            FilteredTreeNodes = new ObservableCollection<AdTreeNode>(TreeNodes);
+            return;
+        }
+
+        FilteredTreeNodes = new ObservableCollection<AdTreeNode>(
+            FilterNodesRecursive(TreeNodes, TreeFilterText));
+    }
+
+    private static IEnumerable<AdTreeNode> FilterNodesRecursive(
+        IEnumerable<AdTreeNode> nodes, string filter)
+    {
+        foreach (AdTreeNode node in nodes)
+        {
+            bool nameMatches = node.Name.Contains(filter, StringComparison.OrdinalIgnoreCase);
+            var matchingChildren = FilterNodesRecursive(node.Children, filter).ToList();
+
+            if (nameMatches || matchingChildren.Count > 0)
+            {
+                var clone = new AdTreeNode
+                {
+                    Name = node.Name,
+                    DistinguishedName = node.DistinguishedName,
+                    ObjectClass = node.ObjectClass,
+                    HasDummyChild = node.HasDummyChild
+                };
+
+                foreach (AdTreeNode child in matchingChildren)
+                {
+                    clone.Children.Add(child);
+                }
+
+                if (matchingChildren.Count > 0)
+                {
+                    clone.IsExpanded = true;
+                }
+
+                yield return clone;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Copies the distinguished name of a tree node to the clipboard.
+    /// </summary>
+    /// <param name="distinguishedName">The DN to copy.</param>
+    [RelayCommand]
+    private void CopyOuPath(string? distinguishedName)
+    {
+        if (string.IsNullOrEmpty(distinguishedName))
+        {
+            return;
+        }
+
+        _dialogService.SetClipboardText(distinguishedName);
+        ResultStatus = "Copied OU path to clipboard";
+    }
 
     /// <summary>
     /// Toggles search history popup visibility.
