@@ -20,7 +20,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $SolutionRoot = Split-Path -Parent $PSScriptRoot
-$ExePath = Join-Path $SolutionRoot "src\SysOpsCommander.App\bin\$Configuration\net8.0-windows\SysOpsCommander.App.exe"
+$ExePath = Join-Path $SolutionRoot "src\SysOpsCommander.App\bin\$Configuration\net8.0-windows10.0.17763.0\SysOpsCommander.App.exe"
 
 Push-Location $SolutionRoot
 try {
