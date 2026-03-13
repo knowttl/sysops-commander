@@ -63,8 +63,8 @@ public sealed class AdExplorerViewModelTests : IDisposable
         await _viewModel.LoadTreeRootCommand.ExecuteAsync(null);
 
         _viewModel.TreeNodes.Should().HaveCount(2);
-        _viewModel.TreeNodes[0].Name.Should().Be("Users");
-        _viewModel.TreeNodes[1].Name.Should().Be("Computers");
+        _viewModel.TreeNodes[0].Name.Should().Be("Computers");
+        _viewModel.TreeNodes[1].Name.Should().Be("Users");
     }
 
     [Fact]
@@ -714,5 +714,54 @@ public sealed class AdExplorerViewModelTests : IDisposable
         await Task.Delay(200);
 
         _viewModel.SelectedObjectPermissions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LoadTreeRoot_SortsNodesAlphabetically()
+    {
+        List<AdObject> children =
+        [
+            new() { Name = "Zebra OU", DistinguishedName = "OU=Zebra,DC=test,DC=local", ObjectClass = "organizationalUnit" },
+            new() { Name = "Alpha OU", DistinguishedName = "OU=Alpha,DC=test,DC=local", ObjectClass = "organizationalUnit" },
+            new() { Name = "Middle OU", DistinguishedName = "OU=Middle,DC=test,DC=local", ObjectClass = "organizationalUnit" }
+        ];
+        _adService.BrowseChildrenAsync("DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(children);
+
+        await _viewModel.LoadTreeRootCommand.ExecuteAsync(null);
+
+        _viewModel.TreeNodes.Should().HaveCount(3);
+        _viewModel.TreeNodes[0].Name.Should().Be("Alpha OU");
+        _viewModel.TreeNodes[1].Name.Should().Be("Middle OU");
+        _viewModel.TreeNodes[2].Name.Should().Be("Zebra OU");
+    }
+
+    [Fact]
+    public async Task TreeFilterText_FiltersTreeNodes()
+    {
+        List<AdObject> children =
+        [
+            new() { Name = "Finance", DistinguishedName = "OU=Finance,DC=test,DC=local", ObjectClass = "organizationalUnit" },
+            new() { Name = "IT", DistinguishedName = "OU=IT,DC=test,DC=local", ObjectClass = "organizationalUnit" },
+            new() { Name = "HR", DistinguishedName = "OU=HR,DC=test,DC=local", ObjectClass = "organizationalUnit" }
+        ];
+        _adService.BrowseChildrenAsync("DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(children);
+
+        await _viewModel.LoadTreeRootCommand.ExecuteAsync(null);
+
+        _viewModel.TreeFilterText = "Fin";
+
+        _viewModel.FilteredTreeNodes.Should().HaveCount(1);
+        _viewModel.FilteredTreeNodes[0].Name.Should().Be("Finance");
+    }
+
+    [Fact]
+    public void CopyOuPath_SetsClipboard()
+    {
+        _viewModel.CopyOuPathCommand.Execute("OU=Finance,DC=test,DC=local");
+
+        _dialogService.Received(1).SetClipboardText("OU=Finance,DC=test,DC=local");
+        _viewModel.ResultStatus.Should().Contain("Copied OU path");
     }
 }

@@ -185,6 +185,15 @@ public partial class AdExplorerView : UserControl
             }
         }
     }
+
+    private void CopyOuPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: AdTreeNode node }
+            && DataContext is AdExplorerViewModel vm)
+        {
+            vm.CopyOuPathCommand.Execute(node.DistinguishedName);
+        }
+    }
 }
 
 /// <summary>

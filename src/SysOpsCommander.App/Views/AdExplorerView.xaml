@@ -141,7 +141,7 @@
 
                     <!-- OU TreeView -->
                     <TreeView Grid.Row="4"
-                              ItemsSource="{Binding TreeNodes}"
+                              ItemsSource="{Binding FilteredTreeNodes}"
                               AutomationProperties.Name="AD Object Tree"
                               x:Name="AdTreeView"
                               VirtualizingStackPanel.IsVirtualizing="True"
@@ -152,6 +152,13 @@
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                 <StackPanel Orientation="Horizontal" Margin="2,1">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu Style="{StaticResource ThemedContextMenuStyle}">
+                                            <MenuItem Header="Copy OU Path"
+                                                      Click="CopyOuPath_Click"
+                                                      AutomationProperties.Name="Copy OU Path" />
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
                                     <TextBlock Text="{Binding ObjectClass, Converter={StaticResource ObjectClassToIconConverter}}"
                                                Foreground="{Binding ObjectClass, Converter={StaticResource ObjectClassToIconColorConverter}}"
                                                FontFamily="Segoe MDL2 Assets"
@@ -161,6 +168,23 @@
                                     <TextBlock Text="{Binding Name}"
                                                Style="{StaticResource BodyTextStyle}"
                                                VerticalAlignment="Center" />
+                                    <TextBlock VerticalAlignment="Center"
+                                               Margin="4,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Children.Count}" Value="0">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                        <TextBlock.Text>
+                                            <Binding Path="Children.Count" StringFormat=" ({0})" />
+                                        </TextBlock.Text>
+                                    </TextBlock>
                                 </StackPanel>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
