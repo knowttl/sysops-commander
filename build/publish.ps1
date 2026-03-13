@@ -41,7 +41,7 @@ try {
         Write-Host "Running tests before publish..." -ForegroundColor Cyan
         dotnet test --nologo -v quiet
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "Tests failed — aborting publish." -ForegroundColor Red
+            Write-Host "Tests failed - aborting publish." -ForegroundColor Red
             exit $LASTEXITCODE
         }
         Write-Host "Tests passed." -ForegroundColor Green
@@ -77,7 +77,7 @@ try {
 
     $exe = Join-Path $OutputDir 'SysOpsCommander.App.exe'
     $size = [math]::Round((Get-Item $exe).Length / 1MB, 1)
-    Write-Host "PUBLISH SUCCEEDED — $exe ($size MB)" -ForegroundColor Green
+    Write-Host "PUBLISH SUCCEEDED - $exe ($size MB)" -ForegroundColor Green
 
     if ($CreateUpdatePackage) {
         $zipPath = Join-Path $SolutionRoot 'SysOpsCommander.zip'
