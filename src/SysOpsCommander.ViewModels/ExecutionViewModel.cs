@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using SysOpsCommander.Core.Constants;
 using SysOpsCommander.Core.Enums;
+using SysOpsCommander.Core.Extensions;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 using SysOpsCommander.Core.Validation;
@@ -608,13 +609,14 @@ public partial class ExecutionViewModel : ObservableObject, IRefreshable, IDispo
     private void OnLibraryChanged(object? sender, ScriptLibraryChangedEventArgs e)
     {
         _logger.Information("Script library changed — refreshing available scripts");
-        _ = RefreshAsync();
+        RefreshAsync().SafeFireAndForget(_logger);
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
         _scriptLoaderService.LibraryChanged -= OnLibraryChanged;
+        _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }

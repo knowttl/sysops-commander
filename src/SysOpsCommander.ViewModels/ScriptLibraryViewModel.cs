@@ -250,6 +250,7 @@ public partial class ScriptLibraryViewModel : ObservableObject, IRefreshable, ID
     public void Dispose()
     {
         _scriptLoaderService.LibraryChanged -= OnLibraryChanged;
+        _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }

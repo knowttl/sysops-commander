@@ -26,6 +26,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private readonly ILogger _logger;
     private CancellationTokenSource? _searchDebounceTimer;
     private readonly CancellationTokenSource _cts = new();
+    private bool _isRefreshing;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -243,6 +244,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [RelayCommand]
     private async Task LoadTreeRootAsync()
     {
+        if (_isRefreshing || _cts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _isRefreshing = true;
         try
         {
             DomainConnection domain = _adService.GetActiveDomain();
@@ -267,6 +274,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         {
             _logger.Error(ex, "Failed to load AD tree root");
             ResultStatus = $"Failed to load tree: {ex.Message}";
+        }
+        finally
+        {
+            _isRefreshing = false;
         }
     }
 
@@ -1433,7 +1444,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// <inheritdoc />
     public void Dispose()
     {
+        _searchDebounceTimer?.Cancel();
         _searchDebounceTimer?.Dispose();
+        _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }

@@ -140,6 +140,7 @@ public partial class DashboardViewModel : ObservableObject, IRefreshable, IDispo
     /// <inheritdoc />
     public void Dispose()
     {
+        _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }
