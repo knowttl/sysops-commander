@@ -1082,6 +1082,16 @@
                                 Margin="4,4,4,4"
                                 Background="Transparent"
                                 BorderThickness="0">
+                        <TabControl.Style>
+                            <Style TargetType="TabControl">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedObject}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TabControl.Style>
                         <!-- Attributes tab -->
                         <TabItem Header="Attributes"
                                  AutomationProperties.Name="Attributes Tab">
@@ -1194,30 +1204,7 @@
                         </TabItem>
                     </TabControl>
 
-                    <!-- Empty state: no object selected -->
-                    <StackPanel Grid.Row="2"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SelectedObject}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <TextBlock Text="&#xE946;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="28"
-                                   Foreground="{DynamicResource TextTertiaryBrush}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,0,0,8" />
-                        <TextBlock Text="Select an object to view details"
-                                   Style="{StaticResource LabelStyle}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
+
                     </Grid>
 
                     <!-- Collapsed rail (40px icon strip) -->
