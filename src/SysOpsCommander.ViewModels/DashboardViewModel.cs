@@ -65,7 +65,7 @@ public partial class DashboardViewModel : ObservableObject, IRefreshable, IDispo
     public async Task RefreshAsync()
     {
         LoadActiveDomain();
-        await LoadRecentExecutionsAsync().ConfigureAwait(false);
+        await LoadRecentExecutionsAsync();
     }
 
     /// <summary>
@@ -109,13 +109,9 @@ public partial class DashboardViewModel : ObservableObject, IRefreshable, IDispo
         {
             var filter = new AuditLogFilter { PageNumber = 1, PageSize = 5 };
             IReadOnlyList<AuditLogEntry> entries = await _auditLogService
-                .QueryAsync(filter, _cts.Token).ConfigureAwait(false);
+                .QueryAsync(filter, _cts.Token);
 
-            RecentExecutions.Clear();
-            foreach (AuditLogEntry entry in entries)
-            {
-                RecentExecutions.Add(entry);
-            }
+            RecentExecutions = new ObservableCollection<AuditLogEntry>(entries);
         }
         catch (OperationCanceledException)
         {

@@ -99,15 +99,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             ActiveDomainDisplay = domain.DomainName;
 
             IReadOnlyList<AdObject> rootChildren = await _adService.BrowseChildrenAsync(
-                domain.RootDistinguishedName, _cts.Token).ConfigureAwait(false);
+                domain.RootDistinguishedName, _cts.Token);
 
-            TreeNodes.Clear();
-            foreach (AdObject child in rootChildren)
-            {
-                AdTreeNode node = MapToTreeNode(child);
-                node.HasDummyChild = true;
-                TreeNodes.Add(node);
-            }
+            TreeNodes = new ObservableCollection<AdTreeNode>(rootChildren.Select(MapToTreeNode));
         }
         catch (OperationCanceledException)
         {
@@ -139,7 +133,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         try
         {
             IReadOnlyList<AdObject> children = await _adService.BrowseChildrenAsync(
-                node.DistinguishedName, _cts.Token).ConfigureAwait(false);
+                node.DistinguishedName, _cts.Token);
 
             foreach (AdObject child in children)
             {
@@ -174,12 +168,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         try
         {
-            AdSearchResult result = await _adService.SearchAsync(SearchText, _cts.Token).ConfigureAwait(false);
-            SearchResults.Clear();
-            foreach (AdObject obj in result.Results)
-            {
-                SearchResults.Add(obj);
-            }
+            AdSearchResult result = await _adService.SearchAsync(SearchText, _cts.Token);
+            SearchResults = new ObservableCollection<AdObject>(result.Results);
 
             ResultStatus = $"{result.TotalResultCount} results found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
         }
@@ -207,7 +197,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         await ExecuteSecurityFilterAsync(
             _adService.GetLockedAccountsAsync,
-            "Locked Accounts").ConfigureAwait(false);
+            "Locked Accounts");
     }
 
     /// <summary>
@@ -219,7 +209,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         await ExecuteSecurityFilterAsync(
             _adService.GetDisabledComputersAsync,
-            "Disabled Computers").ConfigureAwait(false);
+            "Disabled Computers");
     }
 
     /// <summary>
@@ -234,7 +224,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             StaleThresholdDays = await _settingsService.GetTypedAsync(
                 "StaleComputerThresholdDays",
                 AppConstants.DefaultStaleComputerDays,
-                _cts.Token).ConfigureAwait(false);
+                _cts.Token);
         }
         catch (Exception ex)
         {
@@ -244,7 +234,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         await ExecuteSecurityFilterAsync(
             ct => _adService.GetStaleComputersAsync(StaleThresholdDays, ct),
-            $"Stale Computers ({StaleThresholdDays} days)").ConfigureAwait(false);
+            $"Stale Computers ({StaleThresholdDays} days)");
     }
 
     /// <summary>
@@ -259,18 +249,14 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         try
         {
-            IReadOnlyList<string> dcs = await _adService.GetDomainControllersAsync(_cts.Token).ConfigureAwait(false);
-            SearchResults.Clear();
-            foreach (string dc in dcs)
+            IReadOnlyList<string> dcs = await _adService.GetDomainControllersAsync(_cts.Token);
+            SearchResults = new ObservableCollection<AdObject>(dcs.Select(dc => new AdObject
             {
-                SearchResults.Add(new AdObject
-                {
-                    Name = dc,
-                    DistinguishedName = dc,
-                    ObjectClass = "computer",
-                    DisplayName = dc
-                });
-            }
+                Name = dc,
+                DistinguishedName = dc,
+                ObjectClass = "computer",
+                DisplayName = dc
+            }));
 
             ResultStatus = $"{dcs.Count} domain controllers found";
         }
@@ -333,36 +319,37 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
 
         _searchDebounceTimer = new CancellationTokenSource();
-        CancellationToken token = _searchDebounceTimer.Token;
+        _ = DebounceSearchAsync(_searchDebounceTimer.Token);
+    }
 
-        _ = Task.Delay(300, token).ContinueWith(
-            _ => SearchCommand.Execute(null),
-            token,
-            TaskContinuationOptions.OnlyOnRanToCompletion,
-            TaskScheduler.Default);
+    private async Task DebounceSearchAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(300, token);
+            SearchCommand.Execute(null);
+        }
+        catch (OperationCanceledException)
+        {
+            // Debounce cancelled — expected when user types quickly
+        }
     }
 
     private async Task LoadObjectDetailAsync(string dn)
     {
         try
         {
-            AdObject detail = await _adService.GetObjectDetailAsync(dn, _cts.Token).ConfigureAwait(false);
-            SelectedObjectAttributes.Clear();
-            foreach (KeyValuePair<string, string> attr in detail.Attributes
-                         .OrderBy(a => a.Key)
-                         .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)))
-            {
-                SelectedObjectAttributes.Add(attr);
-            }
+            Task<AdObject> detailTask = _adService.GetObjectDetailAsync(dn, _cts.Token);
+            Task<IReadOnlyList<string>> groupsTask = _adService.GetGroupMembershipAsync(
+                dn, recursive: true, _cts.Token);
+            await Task.WhenAll(detailTask, groupsTask);
 
-            IReadOnlyList<string> groups = await _adService.GetGroupMembershipAsync(
-                dn, recursive: true, _cts.Token).ConfigureAwait(false);
+            SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
+                detailTask.Result.Attributes
+                    .OrderBy(a => a.Key)
+                    .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
 
-            SelectedObjectGroups.Clear();
-            foreach (string group in groups)
-            {
-                SelectedObjectGroups.Add(group);
-            }
+            SelectedObjectGroups = new ObservableCollection<string>(groupsTask.Result);
         }
         catch (OperationCanceledException)
         {
@@ -383,12 +370,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         try
         {
-            AdSearchResult result = await filterFunc(_cts.Token).ConfigureAwait(false);
-            SearchResults.Clear();
-            foreach (AdObject obj in result.Results)
-            {
-                SearchResults.Add(obj);
-            }
+            AdSearchResult result = await filterFunc(_cts.Token);
+            SearchResults = new ObservableCollection<AdObject>(result.Results);
 
             ResultStatus = $"{result.TotalResultCount} {filterName} found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
         }

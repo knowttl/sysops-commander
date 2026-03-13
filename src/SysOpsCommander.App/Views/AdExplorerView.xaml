@@ -110,7 +110,9 @@
                     <TreeView Grid.Row="1"
                               ItemsSource="{Binding TreeNodes}"
                               AutomationProperties.Name="AD Object Tree"
-                              x:Name="AdTreeView">
+                              x:Name="AdTreeView"
+                              VirtualizingStackPanel.IsVirtualizing="True"
+                              VirtualizingStackPanel.VirtualizationMode="Recycling">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                 <TextBlock Text="{Binding Name}" />
