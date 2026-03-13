@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using SysOpsCommander.Core.Constants;
+using SysOpsCommander.Core.Extensions;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 
@@ -226,7 +227,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _logger = logger;
 
         InitializeDataGridColumns();
-        _ = LoadPersistedStateAsync();
+        LoadPersistedStateAsync().SafeFireAndForget(_logger);
     }
 
     /// <summary>
@@ -279,6 +280,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         if (node is null || !node.HasDummyChild)
         {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(node.DistinguishedName))
+        {
+            _logger.Warning("Skipping tree expansion — node has empty DistinguishedName");
             return;
         }
 
@@ -683,7 +690,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         if (value is not null)
         {
-            _ = LoadObjectDetailAsync(value.DistinguishedName);
+            LoadObjectDetailAsync(value.DistinguishedName).SafeFireAndForget(_logger);
         }
         else
         {
@@ -703,7 +710,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
 
         _searchDebounceTimer = new CancellationTokenSource();
-        _ = DebounceSearchAsync(_searchDebounceTimer.Token);
+        DebounceSearchAsync(_searchDebounceTimer.Token).SafeFireAndForget(_logger);
     }
 
     private async Task DebounceSearchAsync(CancellationToken token)

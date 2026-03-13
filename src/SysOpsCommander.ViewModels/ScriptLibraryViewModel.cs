@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using SysOpsCommander.Core.Extensions;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 
@@ -221,8 +222,28 @@ public partial class ScriptLibraryViewModel : ObservableObject, IRefreshable, ID
 
     private void OnLibraryChanged(object? sender, ScriptLibraryChangedEventArgs e)
     {
-        _logger.Information("Script library changed — refreshing");
-        _ = RefreshAsync();
+        _logger.Information("Script library changed — reloading cached scripts");
+        ReloadFromCacheAsync().SafeFireAndForget(_logger);
+    }
+
+    private async Task ReloadFromCacheAsync()
+    {
+        try
+        {
+            _allScripts = await _scriptLoaderService.LoadAllScriptsAsync(_cts.Token);
+            RebuildCategories();
+            ApplyFilter();
+            StatusMessage = $"Refreshed — {_allScripts.Count} scripts loaded.";
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled — no action needed
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Script library reload failed");
+            StatusMessage = "Refresh failed.";
+        }
     }
 
     /// <inheritdoc />
