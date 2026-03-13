@@ -18,5 +18,4 @@ public sealed record SearchStateSnapshot(
     bool FilterUsers,
     bool FilterComputers,
     bool FilterGroups,
-    bool FilterOus,
-    bool FilterContacts);
+    bool FilterOus);

@@ -183,7 +183,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
         cancellationToken.ThrowIfCancellationRequested();
 
         string sanitized = LdapFilterSanitizer.SanitizeInput(searchTerm);
-        string filter = $"(|(sAMAccountName=*{sanitized}*)(cn=*{sanitized}*)(displayName=*{sanitized}*)(mail=*{sanitized}*)(dNSHostName=*{sanitized}*))";
+        string filter = $"(|(sAMAccountName=*{sanitized}*)(cn=*{sanitized}*)(displayName=*{sanitized}*)(mail=*{sanitized}*)(dNSHostName=*{sanitized}*)(description=*{sanitized}*))";
 
         return await ExecuteSearchAsync(filter, searchTerm, cancellationToken).ConfigureAwait(false);
     }
@@ -356,7 +356,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
         // Build attribute filter
         string attrFilter = string.IsNullOrEmpty(attribute)
-            ? $"(|(sAMAccountName=*{sanitized}*)(cn=*{sanitized}*)(displayName=*{sanitized}*)(mail=*{sanitized}*)(dNSHostName=*{sanitized}*))"
+            ? $"(|(sAMAccountName=*{sanitized}*)(cn=*{sanitized}*)(displayName=*{sanitized}*)(mail=*{sanitized}*)(dNSHostName=*{sanitized}*)(description=*{sanitized}*))"
             : $"({attribute}=*{sanitized}*)";
 
         // Build object class filter

@@ -84,9 +84,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private bool _filterOus;
 
     [ObservableProperty]
-    private bool _filterContacts;
-
-    [ObservableProperty]
     private bool _filterAll = true;
 
     [ObservableProperty]
@@ -165,7 +162,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private bool _preservedFilterComputers;
     private bool _preservedFilterGroups;
     private bool _preservedFilterOus;
-    private bool _preservedFilterContacts;
 
     /// <summary>
     /// Tracks the pending export format ("csv" or "excel") so the column picker knows which to invoke.
@@ -248,7 +244,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             IReadOnlyList<AdObject> rootChildren = await _adService.BrowseChildrenAsync(
                 domain.RootDistinguishedName, _cts.Token);
 
-            TreeNodes = new ObservableCollection<AdTreeNode>(rootChildren.Select(MapToTreeNode));
+            TreeNodes = new ObservableCollection<AdTreeNode>(
+                rootChildren
+                    .Where(IsNavigableTreeObject)
+                    .Select(MapToTreeNode));
         }
         catch (OperationCanceledException)
         {
@@ -282,7 +281,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             IReadOnlyList<AdObject> children = await _adService.BrowseChildrenAsync(
                 node.DistinguishedName, _cts.Token);
 
-            foreach (AdObject child in children)
+            foreach (AdObject child in children.Where(IsNavigableTreeObject))
             {
                 AdTreeNode childNode = MapToTreeNode(child);
                 node.Children.Add(childNode);
@@ -367,7 +366,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         if (FilterComputers) { filters.Add("computer"); }
         if (FilterGroups) { filters.Add("group"); }
         if (FilterOus) { filters.Add("organizationalUnit"); }
-        if (FilterContacts) { filters.Add("contact"); }
         return filters.Count > 0 ? filters : null;
     }
 
@@ -584,7 +582,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             FilterComputers = false;
             FilterGroups = false;
             FilterOus = false;
-            FilterContacts = false;
+            SearchCommand.Execute(null);
             return;
         }
 
@@ -596,14 +594,15 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             case "computer": FilterComputers = !FilterComputers; break;
             case "group": FilterGroups = !FilterGroups; break;
             case "organizationalUnit": FilterOus = !FilterOus; break;
-            case "contact": FilterContacts = !FilterContacts; break;
             default: break;
         }
 
-        if (!FilterUsers && !FilterComputers && !FilterGroups && !FilterOus && !FilterContacts)
+        if (!FilterUsers && !FilterComputers && !FilterGroups && !FilterOus)
         {
             FilterAll = true;
         }
+
+        SearchCommand.Execute(null);
     }
 
     /// <summary>
@@ -774,6 +773,18 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             HasDummyChild = true
         };
 
+    private static readonly HashSet<string> NavigableObjectClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "organizationalUnit",
+        "container",
+        "builtinDomain",
+        "domainDNS",
+        "domain"
+    };
+
+    private static bool IsNavigableTreeObject(AdObject obj) =>
+        NavigableObjectClasses.Contains(obj.ObjectClass);
+
     /// <summary>
     /// Toggles search history popup visibility.
     /// </summary>
@@ -935,7 +946,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             _preservedFilterComputers = FilterComputers;
             _preservedFilterGroups = FilterGroups;
             _preservedFilterOus = FilterOus;
-            _preservedFilterContacts = FilterContacts;
             IsLdapFilterMode = true;
         }
         else
@@ -948,7 +958,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             FilterComputers = _preservedFilterComputers;
             FilterGroups = _preservedFilterGroups;
             FilterOus = _preservedFilterOus;
-            FilterContacts = _preservedFilterContacts;
         }
     }
 
@@ -1048,7 +1057,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         FilterComputers = snapshot.FilterComputers;
         FilterGroups = snapshot.FilterGroups;
         FilterOus = snapshot.FilterOus;
-        FilterContacts = snapshot.FilterContacts;
 
         if (!string.IsNullOrEmpty(snapshot.ScopeDisplay))
         {
@@ -1259,7 +1267,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         if (FilterComputers) { names.Add("computer"); }
         if (FilterGroups) { names.Add("group"); }
         if (FilterOus) { names.Add("organizationalUnit"); }
-        if (FilterContacts) { names.Add("contact"); }
         return names;
     }
 
@@ -1288,7 +1295,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         FilterComputers = activeFilters.Contains("computer");
         FilterGroups = activeFilters.Contains("group");
         FilterOus = activeFilters.Contains("organizationalUnit");
-        FilterContacts = activeFilters.Contains("contact");
 
         if (!string.IsNullOrEmpty(scopeDn))
         {
@@ -1381,8 +1387,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             FilterUsers,
             FilterComputers,
             FilterGroups,
-            FilterOus,
-            FilterContacts));
+            FilterOus));
 
         while (_undoStack.Count > AppConstants.MaxSearchUndoDepth)
         {

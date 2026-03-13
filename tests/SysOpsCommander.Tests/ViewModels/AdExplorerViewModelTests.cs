@@ -79,7 +79,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
         };
         List<AdObject> children =
         [
-            new() { Name = "Admin", DistinguishedName = "CN=Admin,CN=Users,DC=test,DC=local", ObjectClass = "user" }
+            new() { Name = "Admins OU", DistinguishedName = "OU=Admins,CN=Users,DC=test,DC=local", ObjectClass = "organizationalUnit" }
         ];
         _adService.BrowseChildrenAsync("CN=Users,DC=test,DC=local", Arg.Any<CancellationToken>())
             .Returns(children);
@@ -87,7 +87,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
         await _viewModel.ExpandNodeCommand.ExecuteAsync(node);
 
         node.Children.Should().HaveCount(1);
-        node.Children[0].Name.Should().Be("Admin");
+        node.Children[0].Name.Should().Be("Admins OU");
         node.HasDummyChild.Should().BeFalse();
     }
 
