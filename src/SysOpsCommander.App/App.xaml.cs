@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using SysOpsCommander.App.DependencyInjection;
+using SysOpsCommander.Core.Extensions;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Infrastructure.Database;
 using SysOpsCommander.Infrastructure.Logging;
@@ -65,7 +66,7 @@ public partial class App : Application
         SystemThemeWatcher.Watch(mainWindow);
 
         // Initialize ViewModel after window is shown to avoid blocking startup
-        _ = viewModel.InitializeAsync();
+        viewModel.InitializeAsync().SafeFireAndForget();
     }
 
     /// <summary>
@@ -107,6 +108,17 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         string correlationId = _correlationIdEnricher?.CorrelationId ?? "unknown";
+
+        // WPF-UI FluentWindow may internally apply a Button-targeted style to a ToggleButton
+        // during template loading. This is a benign rendering glitch — suppress the MessageBox.
+        if (e.Exception is System.Windows.Markup.XamlParseException { InnerException: InvalidOperationException ioe }
+            && ioe.Message.Contains("TargetType does not match", StringComparison.Ordinal))
+        {
+            Log.Warning(e.Exception, "Suppressed benign XAML style mismatch. CorrelationId: {CorrelationId}", correlationId);
+            e.Handled = true;
+            return;
+        }
+
         Log.Error(e.Exception, "Unhandled dispatcher exception. CorrelationId: {CorrelationId}", correlationId);
 
         _ = MessageBox.Show(

@@ -161,8 +161,8 @@ public sealed class ScriptLoaderService : IScriptLoaderService
             Modified = modified
         });
 
-        _logger.Information("Script library refreshed: {Added} added, {Removed} removed, {Modified} modified",
-            added.Count, removed.Count, modified.Count);
+        _logger.Information("Script library refreshed: {Added} added, {Removed} removed",
+            added.Count, removed.Count);
     }
 
     private async Task<(ScriptManifest? Manifest, List<string> Errors, List<string> Warnings)> LoadManifestAsync(

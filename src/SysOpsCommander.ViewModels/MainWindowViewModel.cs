@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using SysOpsCommander.Core.Constants;
+using SysOpsCommander.Core.Extensions;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 
@@ -31,7 +32,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (value is IRefreshable refreshable)
         {
-            _ = refreshable.RefreshAsync();
+            refreshable.RefreshAsync().SafeFireAndForget();
         }
     }
 
@@ -117,7 +118,7 @@ public partial class MainWindowViewModel : ObservableObject
         NavigateToDashboard();
         await LoadAvailableDomainsAsync();
 
-        _ = CheckForUpdatesInBackgroundAsync();
+        CheckForUpdatesInBackgroundAsync().SafeFireAndForget();
     }
 
     /// <summary>
@@ -242,7 +243,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (value is not null && !_isInitializing)
         {
-            _ = SwitchDomainAsync(value);
+            SwitchDomainAsync(value).SafeFireAndForget();
         }
     }
 
