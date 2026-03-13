@@ -1158,11 +1158,10 @@
                                         <sys:String>Filter groups...</sys:String>
                                     </TextBox.Tag>
                                 </TextBox>
-                                <ListBox ItemsSource="{Binding FilteredGroups}"
-                                         Background="Transparent"
-                                         BorderThickness="0"
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding FilteredGroups}"
                                          AutomationProperties.Name="Group Membership List">
-                                    <ListBox.ItemTemplate>
+                                    <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding Mode=OneWay, Converter={StaticResource DnToNameConverter}}"
                                                      IsReadOnly="True" IsReadOnlyCaretVisible="True"
@@ -1183,8 +1182,9 @@
                                                 </TextBox.ContextMenu>
                                             </TextBox>
                                         </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </ScrollViewer>
                             </DockPanel>
                         </TabItem>
 
