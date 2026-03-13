@@ -1,7 +1,10 @@
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
 using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using SysOpsCommander.Core.Interfaces;
+using SysOpsCommander.Core.Models;
 
 namespace SysOpsCommander.Services;
 
@@ -167,6 +170,46 @@ public sealed class DirectoryAccessor : IDirectoryAccessor
         }
 
         return sids;
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<AdAccessControlEntry> GetAccessControlEntries(string distinguishedName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(distinguishedName);
+
+        using var entry = new DirectoryEntry($"LDAP://{distinguishedName}");
+        ActiveDirectorySecurity security = entry.ObjectSecurity;
+
+        AuthorizationRuleCollection rules = security.GetAccessRules(
+            includeExplicit: true, includeInherited: true, targetType: typeof(NTAccount));
+
+        var entries = new List<AdAccessControlEntry>(rules.Count);
+
+        foreach (ActiveDirectoryAccessRule rule in rules)
+        {
+            string identity;
+            try
+            {
+                identity = rule.IdentityReference.Value;
+            }
+            catch (IdentityNotMappedException)
+            {
+                identity = rule.IdentityReference.Value;
+            }
+
+            string inheritedFrom = rule.IsInherited
+                ? rule.InheritanceType.ToString()
+                : string.Empty;
+
+            entries.Add(new AdAccessControlEntry(
+                Identity: identity,
+                AccessType: rule.AccessControlType.ToString(),
+                Permission: rule.ActiveDirectoryRights.ToString(),
+                IsInherited: rule.IsInherited,
+                InheritedFrom: rule.IsInherited ? inheritedFrom : null));
+        }
+
+        return entries;
     }
 
     /// <inheritdoc />

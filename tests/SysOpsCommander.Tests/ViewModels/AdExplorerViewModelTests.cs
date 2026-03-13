@@ -636,4 +636,83 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _viewModel.SearchResults.Should().HaveCount(2);
         _viewModel.ResultStatus.Should().Contain("2 members found");
     }
+
+    [Fact]
+    public async Task SelectObject_LoadsPermissions()
+    {
+        List<AdAccessControlEntry> acl =
+        [
+            new("BUILTIN\\Administrators", "Allow", "Full Control", false, null),
+            new("SELF", "Allow", "Read Property", true, "parent")
+        ];
+        _adService.GetObjectDetailAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(new AdObject { Name = "User1", DistinguishedName = "CN=User1,DC=test,DC=local", ObjectClass = "user" });
+        _adService.GetGroupMembershipAsync("CN=User1,DC=test,DC=local", Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _adService.GetObjectAclAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(acl);
+
+        _viewModel.SelectedObject = new AdObject
+        {
+            Name = "User1",
+            DistinguishedName = "CN=User1,DC=test,DC=local",
+            ObjectClass = "user"
+        };
+
+        await Task.Delay(200);
+
+        _viewModel.SelectedObjectPermissions.Should().HaveCount(2);
+        _viewModel.SelectedObjectPermissions[0].Identity.Should().Be("BUILTIN\\Administrators");
+        _viewModel.SelectedObjectPermissions[1].IsInherited.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DeselectObject_ClearsPermissions()
+    {
+        List<AdAccessControlEntry> acl =
+        [
+            new("BUILTIN\\Administrators", "Allow", "Full Control", false, null)
+        ];
+        _adService.GetObjectDetailAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(new AdObject { Name = "User1", DistinguishedName = "CN=User1,DC=test,DC=local", ObjectClass = "user" });
+        _adService.GetGroupMembershipAsync("CN=User1,DC=test,DC=local", Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _adService.GetObjectAclAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(acl);
+
+        _viewModel.SelectedObject = new AdObject
+        {
+            Name = "User1",
+            DistinguishedName = "CN=User1,DC=test,DC=local",
+            ObjectClass = "user"
+        };
+        await Task.Delay(200);
+        _viewModel.SelectedObjectPermissions.Should().NotBeEmpty();
+
+        _viewModel.SelectedObject = null;
+
+        _viewModel.SelectedObjectPermissions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SelectObject_AclAccessDenied_ReturnsEmptyPermissions()
+    {
+        _adService.GetObjectDetailAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns(new AdObject { Name = "User1", DistinguishedName = "CN=User1,DC=test,DC=local", ObjectClass = "user" });
+        _adService.GetGroupMembershipAsync("CN=User1,DC=test,DC=local", Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _adService.GetObjectAclAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        _viewModel.SelectedObject = new AdObject
+        {
+            Name = "User1",
+            DistinguishedName = "CN=User1,DC=test,DC=local",
+            ObjectClass = "user"
+        };
+
+        await Task.Delay(200);
+
+        _viewModel.SelectedObjectPermissions.Should().BeEmpty();
+    }
 }

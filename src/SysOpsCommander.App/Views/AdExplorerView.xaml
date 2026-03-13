@@ -1181,18 +1181,103 @@
                         <!-- Permissions tab (deferred) -->
                         <TabItem Header="Permissions"
                                  AutomationProperties.Name="Permissions Tab">
-                            <StackPanel HorizontalAlignment="Center"
-                                        VerticalAlignment="Center" Margin="16">
-                                <TextBlock Text="&#xE946;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="32"
-                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                            <Grid>
+                                <DataGrid ItemsSource="{Binding SelectedObjectPermissions}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          HeadersVisibility="Column"
+                                          GridLinesVisibility="Horizontal"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          RowHeight="26"
+                                          AutomationProperties.Name="Object Permissions">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Identity" Width="*" SortMemberPath="Identity">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding Identity, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                             Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Type" Width="60" SortMemberPath="AccessType">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding AccessType}" Padding="4,2" FontSize="11.5"
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AccentGreenBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding AccessType}" Value="Deny">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource AccentRedBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Permission" Width="*" SortMemberPath="Permission">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding Permission, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                             Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Inherited" Width="70" SortMemberPath="IsInherited">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Padding="4,2" FontSize="11.5"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="No" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsInherited}" Value="True">
+                                                                        <Setter Property="Text" Value="Yes" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="Inherited From" Width="100" SortMemberPath="InheritedFrom">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding InheritedFrom, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                             Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                             Foreground="{DynamicResource TextTertiaryBrush}" FontSize="11.5" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Empty state when no permissions loaded -->
+                                <TextBlock Text="Select an object to view its permissions"
                                            HorizontalAlignment="Center"
-                                           Margin="0,0,0,8" />
-                                <TextBlock Text="Permissions — Coming soon"
-                                           Style="{StaticResource LabelStyle}"
-                                           HorizontalAlignment="Center" />
-                            </StackPanel>
+                                           VerticalAlignment="Center"
+                                           AutomationProperties.Name="Permissions Empty State">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedObjectPermissions.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
                         </TabItem>
                     </TabControl>
 

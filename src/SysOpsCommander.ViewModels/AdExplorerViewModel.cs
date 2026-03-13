@@ -48,6 +48,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private ObservableCollection<string> _selectedObjectGroups = [];
 
     [ObservableProperty]
+    private ObservableCollection<AdAccessControlEntry> _selectedObjectPermissions = [];
+
+    [ObservableProperty]
     private bool _isSearching;
 
     [ObservableProperty]
@@ -678,6 +681,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         {
             SelectedObjectAttributes.Clear();
             SelectedObjectGroups.Clear();
+            SelectedObjectPermissions.Clear();
         }
     }
 
@@ -714,7 +718,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             Task<AdObject> detailTask = _adService.GetObjectDetailAsync(dn, _cts.Token);
             Task<IReadOnlyList<string>> groupsTask = _adService.GetGroupMembershipAsync(
                 dn, recursive: false, _cts.Token);
-            await Task.WhenAll(detailTask, groupsTask);
+            Task<IReadOnlyList<AdAccessControlEntry>> aclTask = _adService.GetObjectAclAsync(dn, _cts.Token);
+            await Task.WhenAll(detailTask, groupsTask, aclTask);
 
             SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
                 detailTask.Result.Attributes
@@ -723,6 +728,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
             SelectedObjectGroups = new ObservableCollection<string>(
                 groupsTask.Result.Distinct(StringComparer.OrdinalIgnoreCase));
+
+            SelectedObjectPermissions = new ObservableCollection<AdAccessControlEntry>(aclTask.Result);
         }
         catch (OperationCanceledException)
         {

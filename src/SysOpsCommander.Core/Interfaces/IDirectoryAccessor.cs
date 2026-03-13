@@ -1,3 +1,5 @@
+using SysOpsCommander.Core.Models;
+
 namespace SysOpsCommander.Core.Interfaces;
 
 /// <summary>
@@ -58,4 +60,11 @@ public interface IDirectoryAccessor : IDisposable
     /// <param name="distinguishedName">The distinguished name of the object.</param>
     /// <returns>A list of SID byte arrays.</returns>
     IReadOnlyList<byte[]> GetTokenGroups(string distinguishedName);
+
+    /// <summary>
+    /// Reads the DACL (discretionary access control list) entries for the specified AD object.
+    /// </summary>
+    /// <param name="distinguishedName">The distinguished name of the object.</param>
+    /// <returns>A list of access control entries parsed from the object's security descriptor.</returns>
+    IReadOnlyList<AdAccessControlEntry> GetAccessControlEntries(string distinguishedName);
 }

@@ -131,4 +131,12 @@ public interface IActiveDirectoryService
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The search results containing group members.</returns>
     Task<AdSearchResult> GetGroupMembersAsync(string groupDn, bool recursive, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets the access control list (DACL) entries for an AD object.
+    /// </summary>
+    /// <param name="distinguishedName">The distinguished name of the object.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of access control entries, or an empty list if access is denied.</returns>
+    Task<IReadOnlyList<AdAccessControlEntry>> GetObjectAclAsync(string distinguishedName, CancellationToken cancellationToken);
 }
