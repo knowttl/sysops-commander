@@ -1,0 +1,10 @@
+{
+    "name": "Get-SystemInfo",
+    "description": "Collects comprehensive system information including OS, CPU, memory, uptime, and logged-on users.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Inventory",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": []
+}

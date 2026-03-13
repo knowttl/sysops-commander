@@ -1,0 +1,25 @@
+{
+    "name": "Get-ScheduledTasks",
+    "description": "Lists scheduled tasks with their state, last/next run times, and the RunAs account. Can exclude built-in Microsoft tasks.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "Inventory",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": [
+        {
+            "name": "State",
+            "type": "string",
+            "description": "Filter by task state: All, Ready, Running, or Disabled",
+            "required": false,
+            "defaultValue": "All"
+        },
+        {
+            "name": "ExcludeMicrosoft",
+            "type": "switch",
+            "description": "Exclude built-in Microsoft scheduled tasks",
+            "required": false,
+            "defaultValue": "false"
+        }
+    ]
+}

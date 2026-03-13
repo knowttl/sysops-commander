@@ -1,0 +1,10 @@
+{
+    "name": "Get-LocalUsers",
+    "description": "Lists all local user accounts with password status, last logon, and account expiration details.",
+    "version": "1.0.0",
+    "author": "SysOps Team",
+    "category": "UserManagement",
+    "dangerLevel": "Safe",
+    "outputFormat": "Table",
+    "parameters": []
+}
