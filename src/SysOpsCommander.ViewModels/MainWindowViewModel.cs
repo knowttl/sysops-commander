@@ -21,6 +21,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IAutoUpdateService _autoUpdateService;
     private CancellationTokenSource? _globalCancellationSource;
     private bool _isInitializing;
+    private bool _isNavigating;
 
     [ObservableProperty]
     private string _title = AppConstants.AppName;
@@ -28,9 +29,21 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private object? _currentView;
 
-    partial void OnCurrentViewChanged(object? value)
+    partial void OnCurrentViewChanged(object? oldValue, object? newValue)
     {
-        if (value is IRefreshable refreshable)
+        if (oldValue is IDisposable disposable)
+        {
+            try
+            {
+                disposable.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Error disposing previous view {ViewType}", oldValue.GetType().Name);
+            }
+        }
+
+        if (newValue is IRefreshable refreshable)
         {
             refreshable.RefreshAsync().SafeFireAndForget();
         }
@@ -128,28 +141,47 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void Navigate(string? viewName)
     {
-        switch (viewName)
+        if (_isNavigating)
         {
-            case "Dashboard":
-                NavigateToDashboard();
-                break;
-            case "ADExplorer":
-                NavigateToAdExplorer();
-                break;
-            case "Execution":
-                NavigateToExecution();
-                break;
-            case "ScriptLibrary":
-                NavigateToScriptLibrary();
-                break;
-            case "AuditLog":
-                NavigateToAuditLog();
-                break;
-            case "Settings":
-                NavigateToSettings();
-                break;
-            default:
-                break;
+            Log.Debug("Navigation to {ViewName} skipped — already navigating", viewName);
+            return;
+        }
+
+        _isNavigating = true;
+        Log.Debug("Navigating to {ViewName}", viewName);
+        try
+        {
+            switch (viewName)
+            {
+                case "Dashboard":
+                    NavigateToDashboard();
+                    break;
+                case "ADExplorer":
+                    NavigateToAdExplorer();
+                    break;
+                case "Execution":
+                    NavigateToExecution();
+                    break;
+                case "ScriptLibrary":
+                    NavigateToScriptLibrary();
+                    break;
+                case "AuditLog":
+                    NavigateToAuditLog();
+                    break;
+                case "Settings":
+                    NavigateToSettings();
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Navigation to {ViewName} failed", viewName);
+        }
+        finally
+        {
+            _isNavigating = false;
         }
     }
 

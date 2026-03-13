@@ -119,7 +119,18 @@ public partial class App : Application
             return;
         }
 
-        Log.Error(e.Exception, "Unhandled dispatcher exception. CorrelationId: {CorrelationId}", correlationId);
+        // Cancellation and disposal from view navigation are expected — log and suppress
+        if (e.Exception is OperationCanceledException or ObjectDisposedException
+            or TaskCanceledException)
+        {
+            Log.Debug(e.Exception, "Suppressed cancellation/disposal exception. CorrelationId: {CorrelationId}", correlationId);
+            e.Handled = true;
+            return;
+        }
+
+        Log.Error(e.Exception,
+            "Unhandled dispatcher exception. CorrelationId: {CorrelationId}, ExceptionType: {ExceptionType}",
+            correlationId, e.Exception.GetType().FullName);
 
         _ = MessageBox.Show(
             $"An unexpected error occurred.\n\nCorrelation ID: {correlationId}\n\nPlease report this to IT.",
@@ -140,7 +151,18 @@ public partial class App : Application
 
     private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        Log.Error(e.Exception, "Unobserved task exception");
+        // Cancellation from disposed ViewModels is expected during rapid navigation
+        if (e.Exception.InnerExceptions.All(
+                static ex => ex is OperationCanceledException or ObjectDisposedException or TaskCanceledException))
+        {
+            Log.Debug(e.Exception, "Suppressed unobserved cancellation/disposal exception");
+        }
+        else
+        {
+            Log.Error(e.Exception, "Unobserved task exception ({Count} inner exceptions)",
+                e.Exception.InnerExceptions.Count);
+        }
+
         e.SetObserved();
     }
 }
