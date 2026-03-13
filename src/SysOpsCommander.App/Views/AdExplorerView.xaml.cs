@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using SysOpsCommander.Core.Models;
 using SysOpsCommander.ViewModels;
 
 namespace SysOpsCommander.App.Views;
@@ -152,6 +153,24 @@ public partial class AdExplorerView : UserControl
         if (e.NewValue is AdTreeNode node && DataContext is AdExplorerViewModel vm)
         {
             vm.SetScopeCommand.Execute(node.DistinguishedName);
+        }
+    }
+
+    private void RenameSavedSearch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: SavedSearch search }
+            && DataContext is AdExplorerViewModel vm)
+        {
+            vm.RenameSavedSearchCommand.Execute(search);
+        }
+    }
+
+    private void DeleteSavedSearch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: SavedSearch search }
+            && DataContext is AdExplorerViewModel vm)
+        {
+            vm.DeleteSavedSearchCommand.Execute(search);
         }
     }
 }

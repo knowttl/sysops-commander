@@ -45,6 +45,15 @@ public interface IActiveDirectoryService
     Task<AdSearchResult> SearchWithFilterAsync(string ldapFilter, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Searches for AD objects using a raw LDAP filter scoped to a specific base DN.
+    /// </summary>
+    /// <param name="ldapFilter">The sanitized LDAP filter string.</param>
+    /// <param name="baseDn">The base distinguished name to scope the search, or <see langword="null"/> for domain root.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The search results.</returns>
+    Task<AdSearchResult> SearchWithFilterAsync(string ldapFilter, string? baseDn, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Browses the child objects of a specified container.
     /// </summary>
     /// <param name="parentDn">The distinguished name of the parent container.</param>

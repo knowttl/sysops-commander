@@ -14,6 +14,7 @@
         <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ToggleZone1Command}" />
         <KeyBinding Key="D3" Modifiers="Control" Command="{Binding ToggleZone3Command}" />
         <KeyBinding Key="Escape" Command="{Binding CollapseInspectorCommand}" />
+        <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyToClipboardCommand}" />
     </UserControl.InputBindings>
 
     <Grid>
@@ -269,11 +270,15 @@
 
                     <!-- Advanced search bar -->
                     <StackPanel Grid.Row="2" Margin="8,2,8,6">
-                        <!-- Row 1: Attribute selector + search input + button -->
-                        <Grid>
+
+                        <!-- Simple mode: Attribute selector + search input + buttons -->
+                        <Grid Visibility="{Binding IsLdapFilterMode, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ComboBox Grid.Column="0"
@@ -288,10 +293,23 @@
                                      Style="{StaticResource ThemedTextBoxStyle}"
                                      x:Name="SearchTextBox"
                                      AutomationProperties.Name="AD Search Box" />
-                            <Button Grid.Column="2"
+
+                            <!-- Search history dropdown -->
+                            <ToggleButton Grid.Column="2"
+                                          IsChecked="{Binding IsSearchHistoryOpen}"
+                                          Style="{StaticResource PanelChevronToggleButtonStyle}"
+                                          Margin="2,0,0,0"
+                                          Width="24" Height="24"
+                                          ToolTip="Search history"
+                                          AutomationProperties.Name="Search History">
+                                <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
+                            </ToggleButton>
+
+                            <!-- Search button -->
+                            <Button Grid.Column="3"
                                     Command="{Binding SearchCommand}"
                                     Style="{StaticResource PrimaryButtonStyle}"
-                                    Margin="6,0,0,0"
+                                    Margin="4,0,0,0"
                                     AutomationProperties.Name="Search Button">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE721;"
@@ -302,10 +320,91 @@
                                     <TextBlock Text="Search" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
+
+                            <!-- Save search (star) button -->
+                            <ToggleButton Grid.Column="4"
+                                          IsChecked="{Binding IsSavedSearchesOpen}"
+                                          Style="{StaticResource PanelChevronToggleButtonStyle}"
+                                          Margin="4,0,0,0"
+                                          Width="24" Height="24"
+                                          ToolTip="Saved searches"
+                                          AutomationProperties.Name="Saved Searches">
+                                <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
+                            </ToggleButton>
+
+                            <!-- LDAP mode toggle -->
+                            <ToggleButton Grid.Column="5"
+                                          IsChecked="{Binding IsLdapFilterMode, Mode=OneWay}"
+                                          Command="{Binding ToggleLdapFilterModeCommand}"
+                                          Style="{StaticResource FilterPillStyle}"
+                                          Margin="4,0,0,0"
+                                          Padding="6,3"
+                                          ToolTip="Toggle raw LDAP filter mode"
+                                          AutomationProperties.Name="LDAP Filter Mode">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE943;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBlock Text="LDAP" VerticalAlignment="Center" FontSize="11" />
+                                </StackPanel>
+                            </ToggleButton>
                         </Grid>
 
-                        <!-- Row 2: Object class filter pills -->
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <!-- LDAP filter mode: multi-line TextBox + search button -->
+                        <Grid Visibility="{Binding IsLdapFilterMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBox Grid.Column="0" Grid.Row="0"
+                                     Text="{Binding RawLdapFilter, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ThemedTextBoxStyle}"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     MinHeight="60"
+                                     MaxHeight="100"
+                                     VerticalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas"
+                                     FontSize="12"
+                                     AutomationProperties.Name="LDAP Filter Input">
+                                <TextBox.ToolTip>
+                                    <ToolTip Style="{StaticResource ThemedToolTipStyle}"
+                                             Content="Enter a raw LDAP filter, e.g. (&amp;(objectClass=user)(department=IT))" />
+                                </TextBox.ToolTip>
+                            </TextBox>
+
+                            <StackPanel Grid.Column="1" Grid.Row="0"
+                                        VerticalAlignment="Top"
+                                        Margin="4,0,0,0">
+                                <Button Command="{Binding SearchCommand}"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Margin="0,0,0,4"
+                                        AutomationProperties.Name="Search LDAP Filter">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBlock Text="Search" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <ToggleButton IsChecked="{Binding IsLdapFilterMode, Mode=OneWay}"
+                                              Command="{Binding ToggleLdapFilterModeCommand}"
+                                              Style="{StaticResource FilterPillStyle}"
+                                              Padding="6,3"
+                                              ToolTip="Switch to simple search"
+                                              AutomationProperties.Name="Switch to Simple Mode">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE943;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <TextBlock Text="Simple" VerticalAlignment="Center" FontSize="11" />
+                                    </StackPanel>
+                                </ToggleButton>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Object class filter pills (hidden in LDAP mode) -->
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                    Visibility="{Binding IsLdapFilterMode, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
                             <ToggleButton IsChecked="{Binding FilterAll, Mode=OneWay}"
                                           Command="{Binding ToggleFilterCommand}"
                                           CommandParameter="All"
@@ -368,6 +467,167 @@
                                 </StackPanel>
                             </ToggleButton>
                         </StackPanel>
+
+                        <!-- Search history popup -->
+                        <Popup IsOpen="{Binding IsSearchHistoryOpen}"
+                               StaysOpen="False"
+                               Placement="Bottom"
+                               PlacementTarget="{Binding ElementName=SearchTextBox}"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade"
+                               AutomationProperties.Name="Search History Popup">
+                            <Border Background="{DynamicResource Surface2Brush}"
+                                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4"
+                                    Padding="4" MinWidth="350" MaxHeight="320">
+                                <DockPanel>
+                                    <DockPanel DockPanel.Dock="Top" Margin="4,2,4,4">
+                                        <TextBlock Text="Search History"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                        <Button DockPanel.Dock="Right"
+                                                Content="Clear"
+                                                Command="{Binding ClearSearchHistoryCommand}"
+                                                HorizontalAlignment="Right"
+                                                FontSize="11" Padding="6,2"
+                                                Background="Transparent"
+                                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                                BorderThickness="0" Cursor="Hand"
+                                                AutomationProperties.Name="Clear History" />
+                                    </DockPanel>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding SearchHistory}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.ExecuteHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Cursor="Hand"
+                                                            Padding="6,4" Margin="0,1">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding QueryText}"
+                                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                       FontWeight="SemiBold"
+                                                                       FontSize="12"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                <TextBlock Text="{Binding SelectedAttribute}"
+                                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                           FontSize="10.5" Margin="0,0,8,0" />
+                                                                <TextBlock Text="{Binding ResultCount, StringFormat='{}{0} results'}"
+                                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                           FontSize="10.5" Margin="0,0,8,0" />
+                                                                <TextBlock Text="{Binding ExecutedAtUtc, StringFormat='{}{0:g}', ConverterCulture=en-US}"
+                                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                           FontSize="10.5" />
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+                        </Popup>
+
+                        <!-- Saved searches popup -->
+                        <Popup IsOpen="{Binding IsSavedSearchesOpen}"
+                               StaysOpen="False"
+                               Placement="Bottom"
+                               PlacementTarget="{Binding ElementName=SearchTextBox}"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade"
+                               AutomationProperties.Name="Saved Searches Popup">
+                            <Border Background="{DynamicResource Surface2Brush}"
+                                    BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4"
+                                    Padding="4" MinWidth="350" MaxHeight="320">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Top"
+                                            Command="{Binding SaveCurrentSearchCommand}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            HorizontalContentAlignment="Left"
+                                            Cursor="Hand"
+                                            Padding="6,4" Margin="0,2,0,4"
+                                            AutomationProperties.Name="Save Current Search">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                       Foreground="{DynamicResource AccentBlueBrush}" />
+                                            <TextBlock Text="Save current search"
+                                                       Foreground="{DynamicResource AccentBlueBrush}"
+                                                       FontSize="12" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Separator DockPanel.Dock="Top"
+                                               Background="{DynamicResource BorderSubtleBrush}"
+                                               Margin="4,0,4,4" />
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding SavedSearches}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.ExecuteSavedSearchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Cursor="Hand"
+                                                            Padding="6,4" Margin="0,1">
+                                                        <Button.ContextMenu>
+                                                            <ContextMenu Style="{StaticResource ThemedContextMenuStyle}">
+                                                                <MenuItem Header="Rename"
+                                                                          Click="RenameSavedSearch_Click"
+                                                                          AutomationProperties.Name="Rename Saved Search" />
+                                                                <MenuItem Header="Delete"
+                                                                          Click="DeleteSavedSearch_Click"
+                                                                          AutomationProperties.Name="Delete Saved Search" />
+                                                            </ContextMenu>
+                                                        </Button.ContextMenu>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                       FontWeight="SemiBold"
+                                                                       FontSize="12"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                <TextBlock Text="{Binding QueryText}"
+                                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                           FontSize="10.5"
+                                                                           MaxWidth="200"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Margin="0,0,8,0" />
+                                                                <TextBlock Text="{Binding SelectedAttribute}"
+                                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                           FontSize="10.5" />
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                    <!-- Empty state -->
+                                    <TextBlock Text="No saved searches yet"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,8,0,8">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SavedSearches.Count}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DockPanel>
+                            </Border>
+                        </Popup>
 
                         <!-- Row 3: Scope context line -->
                         <DockPanel Margin="0,4,0,0">
@@ -488,7 +748,7 @@
                         </TextBlock>
                     </Grid>
 
-                    <!-- Footer: result count -->
+                    <!-- Footer: result count + export -->
                     <Border Grid.Row="4" Padding="8,4"
                             Background="{DynamicResource Surface2Brush}"
                             CornerRadius="0,0,4,4">
@@ -497,6 +757,139 @@
                                        Text="{Binding ResultStatus}"
                                        Style="{StaticResource CaptionStyle}"
                                        HorizontalAlignment="Right" />
+
+                            <!-- Export button -->
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,12,0">
+                                <Button x:Name="ExportButton"
+                                        Command="{Binding ShowExportMenuCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Padding="8,2" FontSize="11"
+                                        AutomationProperties.Name="Export Results">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xEDE1;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <TextBlock Text="Export" VerticalAlignment="Center" />
+                                        <TextBlock Text=" ▾" VerticalAlignment="Center" FontSize="9" />
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Export menu popup -->
+                                <Popup IsOpen="{Binding IsExportMenuOpen}"
+                                       StaysOpen="False"
+                                       Placement="Top"
+                                       PlacementTarget="{Binding ElementName=ExportButton}"
+                                       AllowsTransparency="True"
+                                       PopupAnimation="Fade"
+                                       AutomationProperties.Name="Export Menu">
+                                    <Border Background="{DynamicResource Surface2Brush}"
+                                            BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4"
+                                            Padding="2" MinWidth="180">
+                                        <StackPanel>
+                                            <Button Command="{Binding CopyToClipboardCommand}"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    HorizontalContentAlignment="Left" Cursor="Hand"
+                                                    Padding="8,5"
+                                                    AutomationProperties.Name="Copy to Clipboard">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                    <TextBlock Text="Copy to Clipboard" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                                                    <TextBlock Text="  Ctrl+C" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Separator Background="{DynamicResource BorderSubtleBrush}" Margin="4,1" />
+                                            <Button Command="{Binding StartCsvExportCommand}"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    HorizontalContentAlignment="Left" Cursor="Hand"
+                                                    Padding="8,5"
+                                                    AutomationProperties.Name="Export to CSV">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE9F9;" FontFamily="Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                    <TextBlock Text="Export to CSV..." Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Command="{Binding StartExcelExportCommand}"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    HorizontalContentAlignment="Left" Cursor="Hand"
+                                                    Padding="8,5"
+                                                    AutomationProperties.Name="Export to Excel">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE9F9;" FontFamily="Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                    <TextBlock Text="Export to Excel..." Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
+                                <!-- Export column picker popup -->
+                                <Popup IsOpen="{Binding IsExportColumnPickerOpen}"
+                                       StaysOpen="True"
+                                       Placement="Top"
+                                       PlacementTarget="{Binding ElementName=ExportButton}"
+                                       AllowsTransparency="True"
+                                       PopupAnimation="Fade"
+                                       AutomationProperties.Name="Column Picker">
+                                    <Border Background="{DynamicResource Surface2Brush}"
+                                            BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4"
+                                            Padding="8" MinWidth="280" MaxHeight="400">
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Top"
+                                                       Text="Select columns to export"
+                                                       Style="{StaticResource LabelStyle}"
+                                                       FontWeight="SemiBold"
+                                                       Margin="0,0,0,6" />
+                                            <StackPanel DockPanel.Dock="Top"
+                                                        Orientation="Horizontal" Margin="0,0,0,6">
+                                                <Button Content="Select All"
+                                                        Command="{Binding SelectAllExportColumnsCommand}"
+                                                        FontSize="11" Padding="6,2"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource AccentBlueBrush}"
+                                                        Cursor="Hand" Margin="0,0,8,0"
+                                                        AutomationProperties.Name="Select All Columns" />
+                                                <Button Content="Deselect All"
+                                                        Command="{Binding DeselectAllExportColumnsCommand}"
+                                                        FontSize="11" Padding="6,2"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource AccentBlueBrush}"
+                                                        Cursor="Hand"
+                                                        AutomationProperties.Name="Deselect All Columns" />
+                                            </StackPanel>
+                                            <StackPanel DockPanel.Dock="Bottom"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Right"
+                                                        Margin="0,6,0,0">
+                                                <Button Content="Export"
+                                                        Command="{Binding ConfirmExportCommand}"
+                                                        Style="{StaticResource PrimaryButtonStyle}"
+                                                        Padding="12,4" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="Confirm Export" />
+                                                <Button Content="Cancel"
+                                                        Command="{Binding CancelExportCommand}"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        Padding="12,4"
+                                                        AutomationProperties.Name="Cancel Export" />
+                                            </StackPanel>
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                          MaxHeight="250">
+                                                <ItemsControl ItemsSource="{Binding AvailableExportColumns}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <CheckBox IsChecked="{Binding IsSelected}"
+                                                                      Content="{Binding ColumnName}"
+                                                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                      FontSize="11.5"
+                                                                      Margin="0,1" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </DockPanel>
+                                    </Border>
+                                </Popup>
+                            </StackPanel>
+
                             <TextBlock Text="{Binding SearchResults.Count, StringFormat='{}{0} results'}"
                                        Style="{StaticResource CaptionStyle}" />
                         </DockPanel>

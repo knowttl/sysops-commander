@@ -115,6 +115,90 @@ public sealed class ExportService : IExportService
     }
 
     /// <inheritdoc/>
+    public async Task ExportAdObjectsToCsvAsync(IEnumerable<AdObject> objects, string filePath, IReadOnlyList<string> columns, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(objects);
+        ArgumentNullException.ThrowIfNull(filePath);
+        ArgumentNullException.ThrowIfNull(columns);
+        _logger.Information("Exporting AD objects to CSV: {FilePath} with {ColumnCount} columns", filePath, columns.Count);
+
+        await using var writer = new StreamWriter(filePath);
+        await using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
+
+        foreach (string column in columns)
+        {
+            csv.WriteField(column);
+        }
+
+        await csv.NextRecordAsync().ConfigureAwait(false);
+
+        foreach (AdObject obj in objects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (string column in columns)
+            {
+                csv.WriteField(GetAdObjectColumnValue(obj, column));
+            }
+
+            await csv.NextRecordAsync().ConfigureAwait(false);
+        }
+
+        await csv.FlushAsync().ConfigureAwait(false);
+        _logger.Information("AD objects CSV export completed: {FilePath}", filePath);
+    }
+
+    /// <inheritdoc/>
+    public Task ExportAdObjectsToExcelAsync(IEnumerable<AdObject> objects, string filePath, IReadOnlyList<string> columns, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(objects);
+        ArgumentNullException.ThrowIfNull(filePath);
+        ArgumentNullException.ThrowIfNull(columns);
+        _logger.Information("Exporting AD objects to Excel: {FilePath} with {ColumnCount} columns", filePath, columns.Count);
+
+        return Task.Run(() =>
+        {
+            using var workbook = new XLWorkbook();
+            IXLWorksheet worksheet = workbook.Worksheets.Add("AD Objects");
+
+            for (int col = 0; col < columns.Count; col++)
+            {
+                worksheet.Cell(1, col + 1).Value = columns[col];
+            }
+
+            int row = 2;
+            foreach (AdObject obj in objects)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (int col = 0; col < columns.Count; col++)
+                {
+                    worksheet.Cell(row, col + 1).Value = GetAdObjectColumnValue(obj, columns[col]);
+                }
+
+                row++;
+            }
+
+            IXLRange headerRange = worksheet.Range(1, 1, 1, columns.Count);
+            headerRange.Style.Font.Bold = true;
+            _ = worksheet.Columns().AdjustToContents();
+
+            workbook.SaveAs(filePath);
+            _logger.Information("AD objects Excel export completed: {FilePath}", filePath);
+        }, cancellationToken);
+    }
+
+    private static string GetAdObjectColumnValue(AdObject obj, string column) =>
+        column.ToUpperInvariant() switch
+        {
+            "NAME" => obj.Name,
+            "OBJECTCLASS" => obj.ObjectClass,
+            "DISPLAYNAME" => obj.DisplayName ?? string.Empty,
+            "DISTINGUISHEDNAME" => obj.DistinguishedName,
+            _ => obj.Attributes.TryGetValue(column, out object? value)
+                ? value?.ToString() ?? string.Empty
+                : string.Empty
+        };
+
+    /// <inheritdoc/>
     public Task ExportAuditLogToExcelAsync(IEnumerable<AuditLogEntry> entries, string filePath, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entries);

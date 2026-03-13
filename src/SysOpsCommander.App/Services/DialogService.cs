@@ -102,4 +102,21 @@ public sealed class DialogService : IDialogService
     /// <inheritdoc/>
     public void ShowInfo(string title, string message) =>
         MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
+
+    /// <inheritdoc/>
+    public Task<string?> ShowInputDialogAsync(string title, string prompt, string defaultValue = "")
+    {
+        var dialog = new InputDialog(title, prompt, defaultValue)
+        {
+            Owner = Application.Current.MainWindow
+        };
+
+        bool? result = dialog.ShowDialog();
+
+        return Task.FromResult(result == true ? dialog.InputText : null);
+    }
+
+    /// <inheritdoc/>
+    public void SetClipboardText(string text) =>
+        Clipboard.SetText(text);
 }

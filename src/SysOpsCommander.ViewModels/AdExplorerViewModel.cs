@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
@@ -18,6 +21,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private readonly IHostTargetingService _hostTargetingService;
     private readonly ISettingsService _settingsService;
     private readonly IDialogService _dialogService;
+    private readonly IExportService _exportService;
     private readonly ILogger _logger;
     private CancellationTokenSource? _searchDebounceTimer;
     private readonly CancellationTokenSource _cts = new();
@@ -94,6 +98,50 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [ObservableProperty]
     private ObservableCollection<BreadcrumbSegment> _breadcrumbSegments = [];
 
+    [ObservableProperty]
+    private ObservableCollection<SearchHistoryEntry> _searchHistory = [];
+
+    [ObservableProperty]
+    private bool _isSearchHistoryOpen;
+
+    [ObservableProperty]
+    private ObservableCollection<SavedSearch> _savedSearches = [];
+
+    [ObservableProperty]
+    private bool _isSavedSearchesOpen;
+
+    [ObservableProperty]
+    private bool _isLdapFilterMode;
+
+    [ObservableProperty]
+    private string _rawLdapFilter = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<ExportColumnSelection> _availableExportColumns = [];
+
+    [ObservableProperty]
+    private bool _isExportColumnPickerOpen;
+
+    [ObservableProperty]
+    private bool _isExportMenuOpen;
+
+    /// <summary>
+    /// Tracks the simple-mode search state preserved when switching to LDAP filter mode.
+    /// </summary>
+    private string _preservedSearchText = string.Empty;
+    private string _preservedSelectedAttribute = "All attributes";
+    private bool _preservedFilterAll = true;
+    private bool _preservedFilterUsers;
+    private bool _preservedFilterComputers;
+    private bool _preservedFilterGroups;
+    private bool _preservedFilterOus;
+    private bool _preservedFilterContacts;
+
+    /// <summary>
+    /// Tracks the pending export format ("csv" or "excel") so the column picker knows which to invoke.
+    /// </summary>
+    private string _pendingExportFormat = string.Empty;
+
     /// <summary>
     /// Gets the list of searchable attribute options.
     /// </summary>
@@ -116,25 +164,31 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// <param name="hostTargetingService">The shared host targeting service.</param>
     /// <param name="settingsService">The settings service for configurable thresholds.</param>
     /// <param name="dialogService">The dialog service for user notifications.</param>
+    /// <param name="exportService">The export service for CSV/Excel output.</param>
     /// <param name="logger">The Serilog logger.</param>
     public AdExplorerViewModel(
         IActiveDirectoryService adService,
         IHostTargetingService hostTargetingService,
         ISettingsService settingsService,
         IDialogService dialogService,
+        IExportService exportService,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(adService);
         ArgumentNullException.ThrowIfNull(hostTargetingService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(dialogService);
+        ArgumentNullException.ThrowIfNull(exportService);
         ArgumentNullException.ThrowIfNull(logger);
 
         _adService = adService;
         _hostTargetingService = hostTargetingService;
         _settingsService = settingsService;
         _dialogService = dialogService;
+        _exportService = exportService;
         _logger = logger;
+
+        _ = LoadPersistedStateAsync();
     }
 
     /// <summary>
@@ -215,7 +269,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [RelayCommand]
     private async Task SearchAsync()
     {
-        if (string.IsNullOrWhiteSpace(SearchText))
+        string queryText = IsLdapFilterMode ? RawLdapFilter : SearchText;
+
+        if (string.IsNullOrWhiteSpace(queryText))
         {
             return;
         }
@@ -225,15 +281,27 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         try
         {
-            string? attribute = SelectedAttribute == "All attributes" ? null : SelectedAttribute;
-            IReadOnlyList<string>? objectClasses = GetActiveObjectClassFilters();
-            string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
+            AdSearchResult result;
 
-            AdSearchResult result = await _adService.SearchScopedAsync(
-                SearchText, baseDn, objectClasses, attribute, _cts.Token);
+            if (IsLdapFilterMode)
+            {
+                string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
+                result = await _adService.SearchWithFilterAsync(RawLdapFilter, baseDn, _cts.Token);
+            }
+            else
+            {
+                string? attribute = SelectedAttribute == "All attributes" ? null : SelectedAttribute;
+                IReadOnlyList<string>? objectClasses = GetActiveObjectClassFilters();
+                string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
+
+                result = await _adService.SearchScopedAsync(
+                    SearchText, baseDn, objectClasses, attribute, _cts.Token);
+            }
 
             SearchResults = new ObservableCollection<AdObject>(result.Results);
             ResultStatus = $"{result.TotalResultCount} results found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
+
+            await RecordSearchHistoryAsync(queryText, result.TotalResultCount);
         }
         catch (OperationCanceledException)
         {
@@ -241,7 +309,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "AD search failed for term: {SearchTerm}", SearchText);
+            _logger.Error(ex, "AD search failed for term: {SearchTerm}", queryText);
             ResultStatus = $"Search failed: {ex.Message}";
         }
         finally
@@ -664,6 +732,466 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             ObjectClass = adObject.ObjectClass,
             HasDummyChild = true
         };
+
+    /// <summary>
+    /// Toggles search history popup visibility.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleSearchHistory()
+    {
+        IsSearchHistoryOpen = !IsSearchHistoryOpen;
+        IsSavedSearchesOpen = false;
+    }
+
+    /// <summary>
+    /// Executes a search history entry by restoring its search state.
+    /// </summary>
+    /// <param name="entry">The history entry to execute.</param>
+    [RelayCommand]
+    private async Task ExecuteHistoryEntryAsync(SearchHistoryEntry? entry)
+    {
+        if (entry is null)
+        {
+            return;
+        }
+
+        IsSearchHistoryOpen = false;
+        RestoreSearchState(entry.QueryText, entry.SelectedAttribute, entry.ActiveFilters, entry.ScopeDn, entry.IsLdapFilterMode);
+        await SearchCommand.ExecuteAsync(null);
+    }
+
+    /// <summary>
+    /// Clears all search history entries.
+    /// </summary>
+    [RelayCommand]
+    private async Task ClearSearchHistoryAsync()
+    {
+        SearchHistory.Clear();
+        IsSearchHistoryOpen = false;
+        await _settingsService.SetAsync(AppConstants.SearchHistoryKey, "[]", _cts.Token);
+    }
+
+    /// <summary>
+    /// Toggles saved searches popup visibility.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleSavedSearches()
+    {
+        IsSavedSearchesOpen = !IsSavedSearchesOpen;
+        IsSearchHistoryOpen = false;
+    }
+
+    /// <summary>
+    /// Saves the current search configuration as a named saved search.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveCurrentSearchAsync()
+    {
+        string queryText = IsLdapFilterMode ? RawLdapFilter : SearchText;
+        if (string.IsNullOrWhiteSpace(queryText))
+        {
+            _dialogService.ShowInfo("Nothing to Save", "Enter a search query first.");
+            return;
+        }
+
+        string? name = await _dialogService.ShowInputDialogAsync(
+            "Save Search", "Enter a name for this search:", queryText);
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        List<string> activeFilters = GetActiveFilterNames();
+        var saved = new SavedSearch(
+            Guid.NewGuid().ToString(),
+            name,
+            queryText,
+            SelectedAttribute,
+            activeFilters,
+            string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay,
+            IsLdapFilterMode,
+            DateTime.UtcNow);
+
+        SavedSearches.Add(saved);
+        IsSavedSearchesOpen = false;
+        await PersistSavedSearchesAsync();
+    }
+
+    /// <summary>
+    /// Executes a saved search by restoring its state and running the query.
+    /// </summary>
+    /// <param name="search">The saved search to execute.</param>
+    [RelayCommand]
+    private async Task ExecuteSavedSearchAsync(SavedSearch? search)
+    {
+        if (search is null)
+        {
+            return;
+        }
+
+        IsSavedSearchesOpen = false;
+        RestoreSearchState(search.QueryText, search.SelectedAttribute, search.ActiveFilters, search.ScopeDn, search.IsLdapFilterMode);
+        await SearchCommand.ExecuteAsync(null);
+    }
+
+    /// <summary>
+    /// Deletes a saved search.
+    /// </summary>
+    /// <param name="search">The saved search to delete.</param>
+    [RelayCommand]
+    private async Task DeleteSavedSearchAsync(SavedSearch? search)
+    {
+        if (search is null)
+        {
+            return;
+        }
+
+        _ = SavedSearches.Remove(search);
+        await PersistSavedSearchesAsync();
+    }
+
+    /// <summary>
+    /// Renames a saved search.
+    /// </summary>
+    /// <param name="search">The saved search to rename.</param>
+    [RelayCommand]
+    private async Task RenameSavedSearchAsync(SavedSearch? search)
+    {
+        if (search is null)
+        {
+            return;
+        }
+
+        string? newName = await _dialogService.ShowInputDialogAsync(
+            "Rename Search", "Enter a new name:", search.Name);
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        int index = SavedSearches.IndexOf(search);
+        if (index >= 0)
+        {
+            SavedSearches[index] = search with { Name = newName };
+            await PersistSavedSearchesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Toggles between simple search and raw LDAP filter mode.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleLdapFilterMode()
+    {
+        if (!IsLdapFilterMode)
+        {
+            _preservedSearchText = SearchText;
+            _preservedSelectedAttribute = SelectedAttribute;
+            _preservedFilterAll = FilterAll;
+            _preservedFilterUsers = FilterUsers;
+            _preservedFilterComputers = FilterComputers;
+            _preservedFilterGroups = FilterGroups;
+            _preservedFilterOus = FilterOus;
+            _preservedFilterContacts = FilterContacts;
+            IsLdapFilterMode = true;
+        }
+        else
+        {
+            IsLdapFilterMode = false;
+            SearchText = _preservedSearchText;
+            SelectedAttribute = _preservedSelectedAttribute;
+            FilterAll = _preservedFilterAll;
+            FilterUsers = _preservedFilterUsers;
+            FilterComputers = _preservedFilterComputers;
+            FilterGroups = _preservedFilterGroups;
+            FilterOus = _preservedFilterOus;
+            FilterContacts = _preservedFilterContacts;
+        }
+    }
+
+    /// <summary>
+    /// Shows the export format menu.
+    /// </summary>
+    [RelayCommand]
+    private void ShowExportMenu() =>
+        IsExportMenuOpen = !IsExportMenuOpen;
+
+    /// <summary>
+    /// Starts the CSV export flow with column picker.
+    /// </summary>
+    [RelayCommand]
+    private void StartCsvExport()
+    {
+        IsExportMenuOpen = false;
+        PopulateExportColumns();
+        _pendingExportFormat = "csv";
+        IsExportColumnPickerOpen = true;
+    }
+
+    /// <summary>
+    /// Starts the Excel export flow with column picker.
+    /// </summary>
+    [RelayCommand]
+    private void StartExcelExport()
+    {
+        IsExportMenuOpen = false;
+        PopulateExportColumns();
+        _pendingExportFormat = "excel";
+        IsExportColumnPickerOpen = true;
+    }
+
+    /// <summary>
+    /// Confirms the selected columns and performs the export.
+    /// </summary>
+    [RelayCommand]
+    private async Task ConfirmExportAsync()
+    {
+        IsExportColumnPickerOpen = false;
+
+        List<string> selectedColumns = [.. AvailableExportColumns
+            .Where(c => c.IsSelected)
+            .Select(c => c.ColumnName)];
+
+        if (selectedColumns.Count == 0)
+        {
+            _dialogService.ShowInfo("No Columns", "Select at least one column to export.");
+            return;
+        }
+
+        List<AdObject> objects = [.. SearchResults];
+
+        if (_pendingExportFormat == "csv")
+        {
+            string? filePath = await _dialogService.ShowSaveFileDialogAsync(".csv", "CSV files|*.csv");
+            if (filePath is null)
+            {
+                return;
+            }
+
+            await _exportService.ExportAdObjectsToCsvAsync(objects, filePath, selectedColumns, _cts.Token);
+            ResultStatus = $"Exported {objects.Count} objects to CSV.";
+        }
+        else if (_pendingExportFormat == "excel")
+        {
+            string? filePath = await _dialogService.ShowSaveFileDialogAsync(".xlsx", "Excel files|*.xlsx");
+            if (filePath is null)
+            {
+                return;
+            }
+
+            await _exportService.ExportAdObjectsToExcelAsync(objects, filePath, selectedColumns, _cts.Token);
+            ResultStatus = $"Exported {objects.Count} objects to Excel.";
+        }
+    }
+
+    /// <summary>
+    /// Cancels the export column picker.
+    /// </summary>
+    [RelayCommand]
+    private void CancelExport() =>
+        IsExportColumnPickerOpen = false;
+
+    /// <summary>
+    /// Selects all export columns.
+    /// </summary>
+    [RelayCommand]
+    private void SelectAllExportColumns()
+    {
+        foreach (ExportColumnSelection col in AvailableExportColumns)
+        {
+            col.IsSelected = true;
+        }
+    }
+
+    /// <summary>
+    /// Deselects all export columns.
+    /// </summary>
+    [RelayCommand]
+    private void DeselectAllExportColumns()
+    {
+        foreach (ExportColumnSelection col in AvailableExportColumns)
+        {
+            col.IsSelected = false;
+        }
+    }
+
+    /// <summary>
+    /// Copies search results to the clipboard as tab-delimited text.
+    /// </summary>
+    [RelayCommand]
+    private void CopyToClipboard()
+    {
+        if (SearchResults.Count == 0)
+        {
+            return;
+        }
+
+        var sb = new StringBuilder();
+        _ = sb.AppendLine("Name\tObjectClass\tDisplayName\tDistinguishedName");
+
+        foreach (AdObject obj in SearchResults)
+        {
+            _ = sb.Append(CultureInfo.InvariantCulture, $"{obj.Name}\t{obj.ObjectClass}\t{obj.DisplayName ?? string.Empty}\t{obj.DistinguishedName}")
+                  .AppendLine();
+        }
+
+        try
+        {
+            _dialogService.SetClipboardText(sb.ToString());
+            ResultStatus = $"Copied {SearchResults.Count} objects to clipboard.";
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to copy to clipboard");
+            ResultStatus = "Failed to copy to clipboard.";
+        }
+    }
+
+    private void PopulateExportColumns()
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Name",
+            "ObjectClass",
+            "DisplayName",
+            "DistinguishedName"
+        };
+
+        foreach (AdObject obj in SearchResults)
+        {
+            foreach (string key in obj.Attributes.Keys)
+            {
+                _ = columns.Add(key);
+            }
+        }
+
+        AvailableExportColumns = new ObservableCollection<ExportColumnSelection>(
+            columns.OrderBy(c => c, StringComparer.OrdinalIgnoreCase)
+                   .Select(c => new ExportColumnSelection { ColumnName = c, IsSelected = true }));
+    }
+
+    private async Task RecordSearchHistoryAsync(string queryText, int resultCount)
+    {
+        try
+        {
+            List<string> activeFilters = GetActiveFilterNames();
+
+            var entry = new SearchHistoryEntry(
+                queryText,
+                SelectedAttribute,
+                activeFilters,
+                string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay,
+                IsLdapFilterMode,
+                resultCount,
+                DateTime.UtcNow);
+
+            SearchHistory.Insert(0, entry);
+
+            while (SearchHistory.Count > AppConstants.MaxSearchHistoryCount)
+            {
+                SearchHistory.RemoveAt(SearchHistory.Count - 1);
+            }
+
+            string json = JsonSerializer.Serialize<List<SearchHistoryEntry>>([.. SearchHistory]);
+            await _settingsService.SetAsync(AppConstants.SearchHistoryKey, json, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to persist search history");
+        }
+    }
+
+    private List<string> GetActiveFilterNames()
+    {
+        if (FilterAll)
+        {
+            return ["All"];
+        }
+
+        var names = new List<string>();
+        if (FilterUsers) { names.Add("user"); }
+        if (FilterComputers) { names.Add("computer"); }
+        if (FilterGroups) { names.Add("group"); }
+        if (FilterOus) { names.Add("organizationalUnit"); }
+        if (FilterContacts) { names.Add("contact"); }
+        return names;
+    }
+
+    private void RestoreSearchState(
+        string queryText,
+        string selectedAttribute,
+        IReadOnlyList<string> activeFilters,
+        string? scopeDn,
+        bool isLdapFilterMode)
+    {
+        if (isLdapFilterMode)
+        {
+            IsLdapFilterMode = true;
+            RawLdapFilter = queryText;
+        }
+        else
+        {
+            IsLdapFilterMode = false;
+            SearchText = queryText;
+        }
+
+        SelectedAttribute = selectedAttribute;
+
+        FilterAll = activeFilters.Contains("All") || activeFilters.Count == 0;
+        FilterUsers = activeFilters.Contains("user");
+        FilterComputers = activeFilters.Contains("computer");
+        FilterGroups = activeFilters.Contains("group");
+        FilterOus = activeFilters.Contains("organizationalUnit");
+        FilterContacts = activeFilters.Contains("contact");
+
+        if (!string.IsNullOrEmpty(scopeDn))
+        {
+            SetScope(scopeDn);
+        }
+        else
+        {
+            ResetScope();
+        }
+    }
+
+    private async Task PersistSavedSearchesAsync()
+    {
+        try
+        {
+            string json = JsonSerializer.Serialize<List<SavedSearch>>([.. SavedSearches]);
+            await _settingsService.SetAsync(AppConstants.SavedSearchesKey, json, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to persist saved searches");
+        }
+    }
+
+    private async Task LoadPersistedStateAsync()
+    {
+        try
+        {
+            string historyJson = await _settingsService.GetAsync(AppConstants.SearchHistoryKey, "[]", _cts.Token);
+            List<SearchHistoryEntry>? history = JsonSerializer.Deserialize<List<SearchHistoryEntry>>(historyJson);
+            if (history is not null)
+            {
+                SearchHistory = new ObservableCollection<SearchHistoryEntry>(history);
+            }
+
+            string savedJson = await _settingsService.GetAsync(AppConstants.SavedSearchesKey, "[]", _cts.Token);
+            List<SavedSearch>? saved = JsonSerializer.Deserialize<List<SavedSearch>>(savedJson);
+            if (saved is not null)
+            {
+                SavedSearches = new ObservableCollection<SavedSearch>(saved);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to load persisted search state");
+        }
+    }
 
     /// <inheritdoc />
     public void Dispose()

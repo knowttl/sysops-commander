@@ -178,6 +178,57 @@ public sealed class ExportServiceTests : IDisposable
         content.Should().Contain("quotes");
     }
 
+    [Fact]
+    public async Task ExportAdObjectsToCsvAsync_WritesSelectedColumns()
+    {
+        string filePath = GetTempFilePath("ad_objects.csv");
+        List<AdObject> objects = CreateSampleAdObjects();
+        List<string> columns = ["Name", "ObjectClass", "DistinguishedName"];
+
+        await _service.ExportAdObjectsToCsvAsync(objects, filePath, columns, CancellationToken.None);
+
+        File.Exists(filePath).Should().BeTrue();
+        string[] lines = await File.ReadAllLinesAsync(filePath);
+        lines.Should().HaveCountGreaterThanOrEqualTo(3);
+        lines[0].Should().Contain("Name");
+        lines[0].Should().Contain("ObjectClass");
+        lines[0].Should().Contain("DistinguishedName");
+        lines[1].Should().Contain("User1");
+    }
+
+    [Fact]
+    public async Task ExportAdObjectsToExcelAsync_WritesSelectedColumns()
+    {
+        string filePath = GetTempFilePath("ad_objects.xlsx");
+        List<AdObject> objects = CreateSampleAdObjects();
+        List<string> columns = ["Name", "ObjectClass", "mail"];
+
+        await _service.ExportAdObjectsToExcelAsync(objects, filePath, columns, CancellationToken.None);
+
+        File.Exists(filePath).Should().BeTrue();
+        using var workbook = new XLWorkbook(filePath);
+        IXLWorksheet worksheet = workbook.Worksheets.First();
+        worksheet.Cell(1, 1).GetText().Should().Be("Name");
+        worksheet.Cell(1, 2).GetText().Should().Be("ObjectClass");
+        worksheet.Cell(1, 3).GetText().Should().Be("mail");
+        worksheet.Cell(2, 1).GetText().Should().Be("User1");
+        worksheet.Cell(2, 3).GetText().Should().Be("user1@test.local");
+    }
+
+    [Fact]
+    public async Task ExportAdObjectsToCsvAsync_FallsBackToAttributesDictionary()
+    {
+        string filePath = GetTempFilePath("ad_attrs.csv");
+        List<AdObject> objects = CreateSampleAdObjects();
+        List<string> columns = ["Name", "mail", "department"];
+
+        await _service.ExportAdObjectsToCsvAsync(objects, filePath, columns, CancellationToken.None);
+
+        string content = await File.ReadAllTextAsync(filePath);
+        content.Should().Contain("user1@test.local");
+        content.Should().Contain("IT");
+    }
+
     private string GetTempFilePath(string fileName) =>
         Path.Combine(_tempDir, fileName);
 
@@ -218,6 +269,32 @@ public sealed class ExportServiceTests : IDisposable
             Status = ExecutionStatus.PartialFailure,
             Duration = TimeSpan.FromSeconds(5),
             ErrorSummary = "HOST-02: Connection refused"
+        }
+    ];
+
+    private static List<AdObject> CreateSampleAdObjects() =>
+    [
+        new()
+        {
+            Name = "User1",
+            DistinguishedName = "CN=User1,DC=test,DC=local",
+            ObjectClass = "user",
+            DisplayName = "User One",
+            Attributes = new Dictionary<string, object?>
+            {
+                ["mail"] = "user1@test.local",
+                ["department"] = "IT"
+            }
+        },
+        new()
+        {
+            Name = "PC1",
+            DistinguishedName = "CN=PC1,DC=test,DC=local",
+            ObjectClass = "computer",
+            Attributes = new Dictionary<string, object?>
+            {
+                ["operatingSystem"] = "Windows 11"
+            }
         }
     ];
 }
