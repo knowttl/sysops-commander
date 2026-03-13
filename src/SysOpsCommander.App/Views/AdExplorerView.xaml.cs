@@ -173,6 +173,18 @@ public partial class AdExplorerView : UserControl
             vm.DeleteSavedSearchCommand.Execute(search);
         }
     }
+
+    private void ShowGroupMembersFromList_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem && DataContext is AdExplorerViewModel vm)
+        {
+            string? groupDn = menuItem.Tag as string;
+            if (!string.IsNullOrEmpty(groupDn))
+            {
+                vm.ShowGroupMembersFromListCommand.Execute(groupDn);
+            }
+        }
+    }
 }
 
 /// <summary>

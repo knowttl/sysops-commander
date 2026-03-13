@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1200"
@@ -217,6 +218,17 @@
                     <!-- Domain badge + Send to Targets -->
                     <DockPanel Grid.Row="0" Margin="8,6,8,2">
                         <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- Back (undo) button -->
+                            <Button Command="{Binding GoBackCommand}"
+                                    Style="{StaticResource PanelChevronButtonStyle}"
+                                    ToolTip="Go back to previous search results"
+                                    Padding="6,4" Margin="0,0,6,0"
+                                    AutomationProperties.Name="Go Back">
+                                <Button.IsEnabled>
+                                    <Binding Path="CanGoBack" />
+                                </Button.IsEnabled>
+                                <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
+                            </Button>
                             <TextBlock Text="AD Explorer"
                                        Style="{StaticResource PanelTitleStyle}"
                                        VerticalAlignment="Center" />
@@ -692,6 +704,7 @@
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True"
                                   SelectionMode="Single"
+                                  SelectionUnit="FullRow"
                                   CanUserSortColumns="True"
                                   CanUserResizeColumns="True"
                                   CanUserReorderColumns="True"
@@ -716,10 +729,46 @@
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-                                <DataGridTextColumn Header="Class" Binding="{Binding ObjectClass}" Width="100" />
-                                <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName}" Width="*" />
-                                <DataGridTextColumn Header="Distinguished Name" Binding="{Binding DistinguishedName}" Width="2*" />
+                                <DataGridTemplateColumn Header="Name" Width="*" SortMemberPath="Name"
+                                                        Visibility="{Binding DataContext.DataGridColumns[0].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Name, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                     Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Class" Width="100" SortMemberPath="ObjectClass"
+                                                        Visibility="{Binding DataContext.DataGridColumns[1].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding ObjectClass, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                     Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Description" Width="*" SortMemberPath="Description"
+                                                        Visibility="{Binding DataContext.DataGridColumns[2].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Description, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                     Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Distinguished Name" Width="2*" SortMemberPath="DistinguishedName"
+                                                        Visibility="{Binding DataContext.DataGridColumns[3].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding DistinguishedName, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                     Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -760,6 +809,48 @@
 
                             <!-- Export button -->
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,12,0">
+                                <!-- Column picker gear button -->
+                                <Button x:Name="ColumnPickerButton"
+                                        Command="{Binding ToggleColumnPickerCommand}"
+                                        Style="{StaticResource PanelChevronButtonStyle}"
+                                        Padding="4,2" Margin="0,0,6,0"
+                                        ToolTip="Show/hide columns"
+                                        AutomationProperties.Name="Column Picker">
+                                    <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+                                </Button>
+
+                                <!-- Column picker popup -->
+                                <Popup IsOpen="{Binding IsColumnPickerOpen}"
+                                       StaysOpen="False"
+                                       Placement="Top"
+                                       PlacementTarget="{Binding ElementName=ColumnPickerButton}"
+                                       AllowsTransparency="True"
+                                       PopupAnimation="Fade"
+                                       AutomationProperties.Name="Column Visibility Picker">
+                                    <Border Background="{DynamicResource Surface2Brush}"
+                                            BorderBrush="{DynamicResource BorderDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4"
+                                            Padding="8" MinWidth="180">
+                                        <StackPanel>
+                                            <TextBlock Text="Visible Columns"
+                                                       Style="{StaticResource LabelStyle}"
+                                                       FontWeight="SemiBold"
+                                                       Margin="0,0,0,6" />
+                                            <ItemsControl ItemsSource="{Binding DataGridColumns}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox IsChecked="{Binding IsVisible}"
+                                                                  Content="{Binding Header}"
+                                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                  FontSize="11.5"
+                                                                  Margin="0,2" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
                                 <Button x:Name="ExportButton"
                                         Command="{Binding ShowExportMenuCommand}"
                                         Style="{StaticResource SecondaryButtonStyle}"
@@ -1004,26 +1095,25 @@
                                       RowHeight="26"
                                       AutomationProperties.Name="Object Attributes">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Attribute" Binding="{Binding Key}" Width="130">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
-                                                <Setter Property="FontSize" Value="11.5" />
-                                                <Setter Property="Padding" Value="4,2" />
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-                                                <Setter Property="FontSize" Value="11.5" />
-                                                <Setter Property="Padding" Value="4,2" />
-                                                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                                <Setter Property="ToolTip" Value="{Binding Value}" />
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
+                                    <DataGridTemplateColumn Header="Attribute" Width="130">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding Key, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                         Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                         Foreground="{DynamicResource TextTertiaryBrush}" FontSize="11.5" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="Value" Width="*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding Value, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                         Background="Transparent" BorderThickness="0" Padding="4,2"
+                                                         Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5"
+                                                         ToolTip="{Binding Value}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
@@ -1050,15 +1140,36 @@
                                         </Style>
                                     </Button.Style>
                                 </Button>
-                                <ListBox ItemsSource="{Binding SelectedObjectGroups}"
+                                <!-- Group filter search bar -->
+                                <TextBox DockPanel.Dock="Top"
+                                         Text="{Binding GroupFilterText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ThemedTextBoxStyle}"
+                                         Margin="4,4,4,2"
+                                         AutomationProperties.Name="Group Filter">
+                                    <TextBox.Tag>
+                                        <sys:String>Filter groups...</sys:String>
+                                    </TextBox.Tag>
+                                </TextBox>
+                                <ListBox ItemsSource="{Binding FilteredGroups}"
                                          Background="Transparent"
                                          BorderThickness="0"
                                          AutomationProperties.Name="Group Membership List">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding}"
-                                                       Style="{StaticResource BodyTextStyle}"
-                                                       Padding="4,3" />
+                                            <TextBox Text="{Binding Mode=OneWay}"
+                                                     IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                     Background="Transparent" BorderThickness="0"
+                                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                                     Padding="4,3">
+                                                <TextBox.ContextMenu>
+                                                    <ContextMenu Style="{StaticResource ThemedContextMenuStyle}">
+                                                        <MenuItem Header="Show group members"
+                                                                  Tag="{Binding}"
+                                                                  Click="ShowGroupMembersFromList_Click"
+                                                                  AutomationProperties.Name="Show Group Members From List" />
+                                                    </ContextMenu>
+                                                </TextBox.ContextMenu>
+                                            </TextBox>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>

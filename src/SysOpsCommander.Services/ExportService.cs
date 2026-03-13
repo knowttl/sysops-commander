@@ -192,6 +192,7 @@ public sealed class ExportService : IExportService
             "NAME" => obj.Name,
             "OBJECTCLASS" => obj.ObjectClass,
             "DISPLAYNAME" => obj.DisplayName ?? string.Empty,
+            "DESCRIPTION" => obj.Description ?? string.Empty,
             "DISTINGUISHEDNAME" => obj.DistinguishedName,
             _ => obj.Attributes.TryGetValue(column, out object? value)
                 ? value?.ToString() ?? string.Empty

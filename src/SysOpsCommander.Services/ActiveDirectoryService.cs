@@ -258,6 +258,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
                 ObjectClass = objectClass,
                 Name = GetStringAttribute(formattedAttributes, "cn") ?? distinguishedName,
                 DisplayName = GetStringAttribute(formattedAttributes, "displayName"),
+                Description = GetStringAttribute(formattedAttributes, "description"),
                 Attributes = formattedAttributes
             };
         }, cancellationToken).ConfigureAwait(false);
@@ -470,6 +471,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
             ObjectClass = objectClass,
             Name = name,
             DisplayName = displayName,
+            Description = GetStringAttribute(properties, "description"),
             Attributes = attributes
         };
     }

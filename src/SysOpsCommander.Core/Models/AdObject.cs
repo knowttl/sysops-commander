@@ -26,6 +26,11 @@ public sealed class AdObject
     public string? DisplayName { get; init; }
 
     /// <summary>
+    /// Gets the description of the AD object, if available.
+    /// </summary>
+    public string? Description { get; init; }
+
+    /// <summary>
     /// Gets all loaded AD attributes as a read-only dictionary.
     /// </summary>
     public IReadOnlyDictionary<string, object?> Attributes { get; init; } =
