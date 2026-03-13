@@ -1010,8 +1010,16 @@
                                     <Button Command="{Binding ExpandInspectorCommand}"
                                             Style="{StaticResource PanelChevronButtonStyle}"
                                             AutomationProperties.Name="Expand Detail Inspector"
-                                            ToolTip="Expand to full width">
+                                            ToolTip="Expand to full width"
+                                            Visibility="{Binding IsInspectorExpanded, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
                                         <TextBlock Text="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
+                                    </Button>
+                                    <Button Command="{Binding CollapseInspectorCommand}"
+                                            Style="{StaticResource PanelChevronButtonStyle}"
+                                            AutomationProperties.Name="Restore Detail Inspector"
+                                            ToolTip="Restore to normal width"
+                                            Visibility="{Binding IsInspectorExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="&#xE73F;" FontFamily="Segoe MDL2 Assets" FontSize="10" />
                                     </Button>
                                     <Button Command="{Binding ToggleZone3Command}"
                                             Style="{StaticResource PanelChevronButtonStyle}"

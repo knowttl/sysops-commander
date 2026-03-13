@@ -74,4 +74,25 @@ public sealed class LdapFilterSanitizerTests
         string result = LdapFilterSanitizer.BuildSafeFilter("cn", "j*smith");
         result.Should().Be(@"(cn=j\2asmith)");
     }
+
+    [Fact]
+    public void SanitizePreservingWildcards_PreservesAsterisk()
+    {
+        string result = LdapFilterSanitizer.SanitizePreservingWildcards("admin*");
+        result.Should().Be("admin*");
+    }
+
+    [Fact]
+    public void SanitizePreservingWildcards_EscapesInjectionButKeepsWildcard()
+    {
+        string result = LdapFilterSanitizer.SanitizePreservingWildcards("admin*)(cn=*");
+        result.Should().Be(@"admin*\29\28cn=*");
+    }
+
+    [Fact]
+    public void SanitizePreservingWildcards_EmptyString_ReturnsEmpty()
+    {
+        string result = LdapFilterSanitizer.SanitizePreservingWildcards("");
+        result.Should().BeEmpty();
+    }
 }
