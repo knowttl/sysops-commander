@@ -749,7 +749,8 @@
                                         <DataTemplate>
                                             <TextBox Text="{Binding Name, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
                                                      Background="Transparent" BorderThickness="0" Padding="4,2"
-                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                                     ContextMenu="{x:Null}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -759,7 +760,8 @@
                                         <DataTemplate>
                                             <TextBox Text="{Binding ObjectClass, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
                                                      Background="Transparent" BorderThickness="0" Padding="4,2"
-                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                                     ContextMenu="{x:Null}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -769,7 +771,8 @@
                                         <DataTemplate>
                                             <TextBox Text="{Binding Description, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
                                                      Background="Transparent" BorderThickness="0" Padding="4,2"
-                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                                     ContextMenu="{x:Null}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -779,7 +782,8 @@
                                         <DataTemplate>
                                             <TextBox Text="{Binding DistinguishedName, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
                                                      Background="Transparent" BorderThickness="0" Padding="4,2"
-                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                                     ContextMenu="{x:Null}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
