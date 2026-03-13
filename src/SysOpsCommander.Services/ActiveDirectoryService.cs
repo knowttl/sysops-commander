@@ -352,12 +352,17 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
         ArgumentException.ThrowIfNullOrWhiteSpace(searchTerm);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string sanitized = LdapFilterSanitizer.SanitizeInput(searchTerm);
+        // Preserve user-typed wildcards (*) for LDAP wildcard matching
+        bool hasWildcard = searchTerm.Contains('*');
+        string sanitized = hasWildcard
+            ? LdapFilterSanitizer.SanitizePreservingWildcards(searchTerm)
+            : LdapFilterSanitizer.SanitizeInput(searchTerm);
 
-        // Build attribute filter
+        // Build attribute filter — skip wrapping with * if user already provided wildcards
+        string wrap = hasWildcard ? string.Empty : "*";
         string attrFilter = string.IsNullOrEmpty(attribute)
-            ? $"(|(sAMAccountName=*{sanitized}*)(cn=*{sanitized}*)(displayName=*{sanitized}*)(mail=*{sanitized}*)(dNSHostName=*{sanitized}*)(description=*{sanitized}*))"
-            : $"({attribute}=*{sanitized}*)";
+            ? $"(|(sAMAccountName={wrap}{sanitized}{wrap})(cn={wrap}{sanitized}{wrap})(displayName={wrap}{sanitized}{wrap})(mail={wrap}{sanitized}{wrap})(dNSHostName={wrap}{sanitized}{wrap})(description={wrap}{sanitized}{wrap}))"
+            : $"({attribute}={wrap}{sanitized}{wrap})";
 
         // Build object class filter
         string classFilter = BuildObjectClassFilter(objectClasses);
