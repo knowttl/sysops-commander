@@ -199,6 +199,17 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
     }
 
     /// <inheritdoc />
+    public async Task<AdSearchResult> SearchWithFilterAsync(string ldapFilter, string? baseDn, CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(ldapFilter);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string effectiveBaseDn = baseDn ?? GetActiveDomain().RootDistinguishedName;
+        return await ExecuteSearchAsync(ldapFilter, ldapFilter, effectiveBaseDn, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<AdObject>> BrowseChildrenAsync(string parentDn, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -439,10 +450,16 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
     {
         string dn = GetStringAttribute(properties, "distinguishedName") ?? string.Empty;
         string objectClass = ExtractObjectClass(properties);
-        string name = GetStringAttribute(properties, "name")
-                      ?? GetStringAttribute(properties, "cn")
-                      ?? GetStringAttribute(properties, "ou")
+        string name = GetNonEmptyAttribute(properties, "name")
+                      ?? GetNonEmptyAttribute(properties, "cn")
+                      ?? GetNonEmptyAttribute(properties, "ou")
                       ?? ExtractRdnValue(dn);
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = dn is { Length: > 0 } ? dn : "(unknown)";
+        }
+
         string? displayName = GetStringAttribute(properties, "displayName");
 
         var attributes = new Dictionary<string, object?>(properties, StringComparer.OrdinalIgnoreCase);
@@ -475,6 +492,12 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
     private static string? GetStringAttribute(Dictionary<string, object?> properties, string name) =>
         properties.TryGetValue(name, out object? value) ? value?.ToString() : null;
+
+    private static string? GetNonEmptyAttribute(Dictionary<string, object?> properties, string name)
+    {
+        string? value = GetStringAttribute(properties, name);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
 
     /// <summary>
     /// Extracts the value portion of the first RDN component from a DN.

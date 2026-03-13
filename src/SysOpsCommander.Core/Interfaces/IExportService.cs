@@ -42,4 +42,24 @@ public interface IExportService
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task ExportAuditLogToCsvAsync(IEnumerable<AuditLogEntry> entries, string filePath, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Exports Active Directory objects to a CSV file with user-selected columns.
+    /// </summary>
+    /// <param name="objects">The AD objects to export.</param>
+    /// <param name="filePath">The output file path.</param>
+    /// <param name="columns">The ordered list of column names to include in the export.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task ExportAdObjectsToCsvAsync(IEnumerable<AdObject> objects, string filePath, IReadOnlyList<string> columns, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Exports Active Directory objects to an Excel file with user-selected columns.
+    /// </summary>
+    /// <param name="objects">The AD objects to export.</param>
+    /// <param name="filePath">The output file path.</param>
+    /// <param name="columns">The ordered list of column names to include in the export.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task ExportAdObjectsToExcelAsync(IEnumerable<AdObject> objects, string filePath, IReadOnlyList<string> columns, CancellationToken cancellationToken);
 }

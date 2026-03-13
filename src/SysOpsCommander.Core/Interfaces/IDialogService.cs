@@ -58,4 +58,19 @@ public interface IDialogService
     /// <param name="title">The dialog title.</param>
     /// <param name="message">The informational message.</param>
     void ShowInfo(string title, string message);
+
+    /// <summary>
+    /// Shows a text input dialog and returns the entered value, or <see langword="null"/> if cancelled.
+    /// </summary>
+    /// <param name="title">The dialog title.</param>
+    /// <param name="prompt">The prompt message displayed to the user.</param>
+    /// <param name="defaultValue">The default text value pre-populated in the input field.</param>
+    /// <returns>The text entered by the user, or <see langword="null"/> if cancelled.</returns>
+    Task<string?> ShowInputDialogAsync(string title, string prompt, string defaultValue = "");
+
+    /// <summary>
+    /// Sets text content to the system clipboard.
+    /// </summary>
+    /// <param name="text">The text to place on the clipboard.</param>
+    void SetClipboardText(string text);
 }

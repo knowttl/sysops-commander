@@ -69,4 +69,19 @@ public static class AppConstants
     /// The default category assigned to scripts without a manifest.
     /// </summary>
     public const string DefaultScriptCategory = "Uncategorized";
+
+    /// <summary>
+    /// The settings key for persisted AD Explorer search history.
+    /// </summary>
+    public const string SearchHistoryKey = "AdExplorer.SearchHistory";
+
+    /// <summary>
+    /// The settings key for persisted AD Explorer saved searches.
+    /// </summary>
+    public const string SavedSearchesKey = "AdExplorer.SavedSearches";
+
+    /// <summary>
+    /// The maximum number of search history entries retained.
+    /// </summary>
+    public const int MaxSearchHistoryCount = 25;
 }
