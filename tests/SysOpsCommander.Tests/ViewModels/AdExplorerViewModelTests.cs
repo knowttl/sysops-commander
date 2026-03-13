@@ -478,7 +478,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
             Name = "PC1",
             DistinguishedName = "CN=PC1,DC=test,DC=local",
             ObjectClass = "computer",
-            DisplayName = "PC One"
+            Description = "Test Computer"
         });
 
         _viewModel.CopyToClipboardCommand.Execute(null);
@@ -493,5 +493,147 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _viewModel.CopyToClipboardCommand.Execute(null);
 
         _dialogService.DidNotReceive().SetClipboardText(Arg.Any<string>());
+    }
+
+    [Fact]
+    public void SearchEntireDomain_DefaultsToTrue() =>
+        _viewModel.SearchEntireDomain.Should().BeTrue();
+
+    [Fact]
+    public void DataGridColumns_InitializedWithFourColumns()
+    {
+        _viewModel.DataGridColumns.Should().HaveCount(4);
+        _viewModel.DataGridColumns[0].Header.Should().Be("Name");
+        _viewModel.DataGridColumns[1].Header.Should().Be("Class");
+        _viewModel.DataGridColumns[2].Header.Should().Be("Description");
+        _viewModel.DataGridColumns[3].Header.Should().Be("Distinguished Name");
+    }
+
+    [Fact]
+    public void DataGridColumns_AllVisibleByDefault() =>
+        _viewModel.DataGridColumns.Should().OnlyContain(c => c.IsVisible);
+
+    [Fact]
+    public async Task GoBack_RestoresPreviousSearchState()
+    {
+        _viewModel.SearchResults.Add(new AdObject
+        {
+            Name = "Original",
+            DistinguishedName = "CN=Original,DC=test,DC=local",
+            ObjectClass = "user"
+        });
+        _viewModel.ResultStatus = "1 results";
+
+        var result = new AdSearchResult
+        {
+            Query = "new",
+            TotalResultCount = 2,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(10),
+            Results =
+            [
+                new AdObject { Name = "New1", DistinguishedName = "CN=New1,DC=test,DC=local", ObjectClass = "user" },
+                new AdObject { Name = "New2", DistinguishedName = "CN=New2,DC=test,DC=local", ObjectClass = "user" }
+            ]
+        };
+        _adService.SearchScopedAsync("new", Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(result);
+
+        _viewModel.SearchText = "new";
+        await _viewModel.SearchCommand.ExecuteAsync(null);
+
+        _viewModel.SearchResults.Should().HaveCount(2);
+        _viewModel.CanGoBack.Should().BeTrue();
+
+        _viewModel.GoBackCommand.Execute(null);
+
+        _viewModel.SearchResults.Should().HaveCount(1);
+        _viewModel.SearchResults[0].Name.Should().Be("Original");
+    }
+
+    [Fact]
+    public void GoBack_EmptyStack_DoesNothing()
+    {
+        _viewModel.CanGoBack.Should().BeFalse();
+        _viewModel.GoBackCommand.Execute(null);
+        _viewModel.CanGoBack.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GoBack_LimitedToMaxUndoDepth()
+    {
+        var result = new AdSearchResult
+        {
+            Query = "q",
+            TotalResultCount = 1,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(5),
+            Results = [new AdObject { Name = "Obj", DistinguishedName = "CN=Obj,DC=test,DC=local", ObjectClass = "user" }]
+        };
+        _adService.SearchScopedAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(result);
+
+        for (int i = 0; i < 8; i++)
+        {
+            _viewModel.SearchText = $"query{i}";
+            await _viewModel.SearchCommand.ExecuteAsync(null);
+        }
+
+        int backCount = 0;
+        while (_viewModel.CanGoBack)
+        {
+            _viewModel.GoBackCommand.Execute(null);
+            backCount++;
+        }
+
+        backCount.Should().BeLessThanOrEqualTo(AppConstants.MaxSearchUndoDepth);
+    }
+
+    [Fact]
+    public void GroupFilterText_FiltersGroups()
+    {
+        _viewModel.SelectedObjectGroups = new System.Collections.ObjectModel.ObservableCollection<string>(
+            ["Domain Admins", "Enterprise Admins", "Domain Users", "Backup Operators"]);
+
+        _viewModel.GroupFilterText = "Admin";
+
+        _viewModel.FilteredGroups.Should().HaveCount(2);
+        _viewModel.FilteredGroups.Should().Contain("Domain Admins");
+        _viewModel.FilteredGroups.Should().Contain("Enterprise Admins");
+    }
+
+    [Fact]
+    public void GroupFilterText_EmptyString_ShowsAll()
+    {
+        _viewModel.SelectedObjectGroups = new System.Collections.ObjectModel.ObservableCollection<string>(
+            ["Group1", "Group2", "Group3"]);
+
+        _viewModel.GroupFilterText = "";
+
+        _viewModel.FilteredGroups.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task ShowGroupMembersFromList_PopulatesResults()
+    {
+        var result = new AdSearchResult
+        {
+            Query = "members",
+            TotalResultCount = 2,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(15),
+            Results =
+            [
+                new AdObject { Name = "Member1", DistinguishedName = "CN=Member1,DC=test,DC=local", ObjectClass = "user" },
+                new AdObject { Name = "Member2", DistinguishedName = "CN=Member2,DC=test,DC=local", ObjectClass = "user" }
+            ]
+        };
+        _adService.GetGroupMembersAsync("CN=Admins,DC=test,DC=local", true, Arg.Any<CancellationToken>())
+            .Returns(result);
+
+        await _viewModel.ShowGroupMembersFromListCommand.ExecuteAsync("CN=Admins,DC=test,DC=local");
+
+        _viewModel.SearchResults.Should().HaveCount(2);
+        _viewModel.ResultStatus.Should().Contain("2 members found");
     }
 }

@@ -84,4 +84,14 @@ public static class AppConstants
     /// The maximum number of search history entries retained.
     /// </summary>
     public const int MaxSearchHistoryCount = 25;
+
+    /// <summary>
+    /// The settings key for persisted AD Explorer DataGrid column visibility.
+    /// </summary>
+    public const string ColumnVisibilityKey = "AdExplorer.ColumnVisibility";
+
+    /// <summary>
+    /// The maximum number of search state snapshots retained for undo navigation.
+    /// </summary>
+    public const int MaxSearchUndoDepth = 5;
 }

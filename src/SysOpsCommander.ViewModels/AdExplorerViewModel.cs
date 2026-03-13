@@ -90,7 +90,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private bool _filterAll = true;
 
     [ObservableProperty]
-    private bool _searchEntireDomain;
+    private bool _searchEntireDomain = true;
 
     [ObservableProperty]
     private string _scopeDisplay = string.Empty;
@@ -126,6 +126,36 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private bool _isExportMenuOpen;
 
     /// <summary>
+    /// Gets or sets the filter text for the groups tab search bar.
+    /// </summary>
+    [ObservableProperty]
+    private string _groupFilterText = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the filtered group membership list.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<string> _filteredGroups = [];
+
+    /// <summary>
+    /// Gets or sets whether the column picker popup is open.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isColumnPickerOpen;
+
+    /// <summary>
+    /// Gets or sets the configurable DataGrid columns.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<DataGridColumnConfig> _dataGridColumns = [];
+
+    /// <summary>
+    /// Gets a value indicating whether the search undo stack has entries.
+    /// </summary>
+    [ObservableProperty]
+    private bool _canGoBack;
+
+    /// <summary>
     /// Tracks the simple-mode search state preserved when switching to LDAP filter mode.
     /// </summary>
     private string _preservedSearchText = string.Empty;
@@ -141,6 +171,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// Tracks the pending export format ("csv" or "excel") so the column picker knows which to invoke.
     /// </summary>
     private string _pendingExportFormat = string.Empty;
+
+    /// <summary>
+    /// Stack of previous search states for undo navigation (max <see cref="AppConstants.MaxSearchUndoDepth"/>).
+    /// </summary>
+    private readonly List<SearchStateSnapshot> _undoStack = [];
 
     /// <summary>
     /// Gets the list of searchable attribute options.
@@ -188,6 +223,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _exportService = exportService;
         _logger = logger;
 
+        InitializeDataGridColumns();
         _ = LoadPersistedStateAsync();
     }
 
@@ -276,6 +312,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             return;
         }
 
+        PushSearchState();
         IsSearching = true;
         ResultStatus = "Searching...";
 
@@ -390,6 +427,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     [RelayCommand]
     private async Task GetDomainControllersAsync()
     {
+        PushSearchState();
         IsSearching = true;
         ResultStatus = "Loading domain controllers...";
 
@@ -454,6 +492,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             return;
         }
 
+        PushSearchState();
         IsSearching = true;
         ResultStatus = "Loading group members...";
 
@@ -699,6 +738,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         Func<CancellationToken, Task<AdSearchResult>> filterFunc,
         string filterName)
     {
+        PushSearchState();
         IsSearching = true;
         ResultStatus = $"Loading {filterName}...";
 
@@ -919,6 +959,109 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         IsExportMenuOpen = !IsExportMenuOpen;
 
     /// <summary>
+    /// Toggles the DataGrid column picker popup.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleColumnPicker() =>
+        IsColumnPickerOpen = !IsColumnPickerOpen;
+
+    /// <summary>
+    /// Toggles visibility of a specific DataGrid column and persists the choice.
+    /// </summary>
+    /// <param name="config">The column config to toggle.</param>
+    [RelayCommand]
+    private async Task ToggleColumnVisibilityAsync(DataGridColumnConfig? config)
+    {
+        if (config is null)
+        {
+            return;
+        }
+
+        config.IsVisible = !config.IsVisible;
+        await PersistColumnVisibilityAsync();
+    }
+
+    /// <summary>
+    /// Shows the members of the specified group by its distinguished name.
+    /// </summary>
+    /// <param name="groupDn">The distinguished name of the group.</param>
+    [RelayCommand]
+    private async Task ShowGroupMembersFromListAsync(string? groupDn)
+    {
+        if (string.IsNullOrEmpty(groupDn))
+        {
+            return;
+        }
+
+        PushSearchState();
+        IsSearching = true;
+        ResultStatus = "Loading group members...";
+
+        try
+        {
+            AdSearchResult result = await _adService.GetGroupMembersAsync(
+                groupDn, recursive: true, _cts.Token);
+
+            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            ResultStatus = $"{result.TotalResultCount} members found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
+        }
+        catch (OperationCanceledException)
+        {
+            ResultStatus = "Operation cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to load group members for {DN}", groupDn);
+            ResultStatus = $"Failed to load group members: {ex.Message}";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>
+    /// Navigates back to the previous search state (undo).
+    /// </summary>
+    [RelayCommand]
+    private void GoBack()
+    {
+        if (_undoStack.Count == 0)
+        {
+            return;
+        }
+
+        SearchStateSnapshot snapshot = _undoStack[^1];
+        _undoStack.RemoveAt(_undoStack.Count - 1);
+        CanGoBack = _undoStack.Count > 0;
+
+        SearchResults = snapshot.Results;
+        ResultStatus = snapshot.ResultStatus;
+        SearchText = snapshot.SearchText;
+        SelectedAttribute = snapshot.SelectedAttribute;
+        IsLdapFilterMode = snapshot.IsLdapFilterMode;
+        RawLdapFilter = snapshot.RawLdapFilter;
+        SearchEntireDomain = snapshot.SearchEntireDomain;
+        FilterAll = snapshot.FilterAll;
+        FilterUsers = snapshot.FilterUsers;
+        FilterComputers = snapshot.FilterComputers;
+        FilterGroups = snapshot.FilterGroups;
+        FilterOus = snapshot.FilterOus;
+        FilterContacts = snapshot.FilterContacts;
+
+        if (!string.IsNullOrEmpty(snapshot.ScopeDisplay))
+        {
+            ScopeDisplay = snapshot.ScopeDisplay;
+            UpdateBreadcrumbs(snapshot.ScopeDisplay);
+        }
+        else
+        {
+            ScopeDisplay = string.Empty;
+            BreadcrumbSegments.Clear();
+        }
+    }
+
+    /// <summary>
     /// Starts the CSV export flow with column picker.
     /// </summary>
     [RelayCommand]
@@ -1029,11 +1172,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
 
         var sb = new StringBuilder();
-        _ = sb.AppendLine("Name\tObjectClass\tDisplayName\tDistinguishedName");
+        _ = sb.AppendLine("Name\tObjectClass\tDescription\tDistinguishedName");
 
         foreach (AdObject obj in SearchResults)
         {
-            _ = sb.Append(CultureInfo.InvariantCulture, $"{obj.Name}\t{obj.ObjectClass}\t{obj.DisplayName ?? string.Empty}\t{obj.DistinguishedName}")
+            _ = sb.Append(CultureInfo.InvariantCulture, $"{obj.Name}\t{obj.ObjectClass}\t{obj.Description ?? string.Empty}\t{obj.DistinguishedName}")
                   .AppendLine();
         }
 
@@ -1055,7 +1198,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         {
             "Name",
             "ObjectClass",
-            "DisplayName",
+            "Description",
             "DistinguishedName"
         };
 
@@ -1186,6 +1329,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             {
                 SavedSearches = new ObservableCollection<SavedSearch>(saved);
             }
+
+            await LoadColumnVisibilityAsync();
         }
         catch (Exception ex)
         {
@@ -1199,6 +1344,99 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _searchDebounceTimer?.Dispose();
         _cts.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    partial void OnGroupFilterTextChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            FilteredGroups = new ObservableCollection<string>(SelectedObjectGroups);
+        }
+        else
+        {
+            FilteredGroups = new ObservableCollection<string>(
+                SelectedObjectGroups.Where(g => g.Contains(value, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    partial void OnSelectedObjectGroupsChanged(ObservableCollection<string> value)
+    {
+        GroupFilterText = string.Empty;
+        FilteredGroups = new ObservableCollection<string>(value);
+    }
+
+    private void PushSearchState()
+    {
+        _undoStack.Add(new SearchStateSnapshot(
+            new ObservableCollection<AdObject>(SearchResults),
+            ResultStatus,
+            SearchText,
+            SelectedAttribute,
+            IsLdapFilterMode,
+            RawLdapFilter,
+            string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay,
+            SearchEntireDomain,
+            FilterAll,
+            FilterUsers,
+            FilterComputers,
+            FilterGroups,
+            FilterOus,
+            FilterContacts));
+
+        while (_undoStack.Count > AppConstants.MaxSearchUndoDepth)
+        {
+            _undoStack.RemoveAt(0);
+        }
+
+        CanGoBack = true;
+    }
+
+    private void InitializeDataGridColumns()
+    {
+        DataGridColumns =
+        [
+            new DataGridColumnConfig { Header = "Name", PropertyName = "Name" },
+            new DataGridColumnConfig { Header = "Class", PropertyName = "ObjectClass" },
+            new DataGridColumnConfig { Header = "Description", PropertyName = "Description" },
+            new DataGridColumnConfig { Header = "Distinguished Name", PropertyName = "DistinguishedName" }
+        ];
+    }
+
+    private async Task PersistColumnVisibilityAsync()
+    {
+        try
+        {
+            var visibility = DataGridColumns.ToDictionary(c => c.PropertyName, c => c.IsVisible);
+            string json = JsonSerializer.Serialize(visibility);
+            await _settingsService.SetAsync(AppConstants.ColumnVisibilityKey, json, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to persist column visibility");
+        }
+    }
+
+    private async Task LoadColumnVisibilityAsync()
+    {
+        try
+        {
+            string json = await _settingsService.GetAsync(AppConstants.ColumnVisibilityKey, "{}", _cts.Token);
+            Dictionary<string, bool>? visibility = JsonSerializer.Deserialize<Dictionary<string, bool>>(json);
+            if (visibility is not null)
+            {
+                foreach (DataGridColumnConfig col in DataGridColumns)
+                {
+                    if (visibility.TryGetValue(col.PropertyName, out bool isVisible))
+                    {
+                        col.IsVisible = isVisible;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to load column visibility");
+        }
     }
 }
 
