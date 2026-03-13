@@ -393,6 +393,34 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<AdAccessControlEntry>> GetObjectAclAsync(
+        string distinguishedName,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(distinguishedName);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                return _directoryAccessor.GetAccessControlEntries(distinguishedName);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.Warning(ex, "Insufficient permissions to read ACL for {DN}", distinguishedName);
+                return [];
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {
+                _logger.Warning(ex, "Failed to read ACL for {DN}", distinguishedName);
+                return [];
+            }
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)
