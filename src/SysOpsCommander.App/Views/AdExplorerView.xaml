@@ -1079,11 +1079,9 @@
 
                     <!-- Detail content: Attributes + Group Membership tabs -->
                     <TabControl Grid.Row="2"
-                                Margin="4,4,4,4"
-                                Background="Transparent"
-                                BorderThickness="0">
+                                Margin="4,4,4,4">
                         <TabControl.Style>
-                            <Style TargetType="TabControl">
+                            <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
                                 <Setter Property="Visibility" Value="Visible" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding SelectedObject}" Value="{x:Null}">
@@ -1166,11 +1164,15 @@
                                          AutomationProperties.Name="Group Membership List">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBox Text="{Binding Mode=OneWay}"
+                                            <TextBox Text="{Binding Mode=OneWay, Converter={StaticResource DnToNameConverter}}"
                                                      IsReadOnly="True" IsReadOnlyCaretVisible="True"
                                                      Background="Transparent" BorderThickness="0"
                                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                                      Padding="4,3">
+                                                <TextBox.ToolTip>
+                                                    <ToolTip Style="{StaticResource ThemedToolTipStyle}"
+                                                             Content="{Binding}" />
+                                                </TextBox.ToolTip>
                                                 <TextBox.ContextMenu>
                                                     <ContextMenu Style="{StaticResource ThemedContextMenuStyle}">
                                                         <MenuItem Header="Show group members"

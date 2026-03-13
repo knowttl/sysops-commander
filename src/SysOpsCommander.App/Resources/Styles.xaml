@@ -12,6 +12,7 @@
     <converters:ObjectClassToIconColorConverter x:Key="ObjectClassToIconColorConverter" />
     <converters:RelativeTimeConverter x:Key="RelativeTimeConverter" />
     <converters:TruncatedTextConverter x:Key="TruncatedTextConverter" />
+    <converters:DnToNameConverter x:Key="DnToNameConverter" />
 
     <!-- Navigation Button Style -->
     <Style x:Key="NavButtonStyle" TargetType="Button">
