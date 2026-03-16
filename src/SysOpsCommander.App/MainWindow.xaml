@@ -8,6 +8,8 @@
         Title="{Binding Title}"
         Height="700"
         Width="1100"
+        MinWidth="960"
+        MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ExtendsContentIntoTitleBar="True"
         Icon="pack://application:,,,/Assets/app-icon.ico"
@@ -170,6 +172,18 @@
                               DisplayMemberPath="DomainName"
                               MinWidth="160"
                               AutomationProperties.Name="Domain Selector" />
+                    <Button Command="{Binding OpenDomainSelectorCommand}"
+                            Margin="4,0,0,0"
+                            Padding="6,4"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            ToolTip="Connect to a custom domain... (Ctrl+D)"
+                            AutomationProperties.Name="Connect to Custom Domain">
+                        <ui:SymbolIcon Symbol="Globe24"
+                                      FontSize="20"
+                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    </Button>
                 </StackPanel>
             </StatusBarItem>
             <Separator />

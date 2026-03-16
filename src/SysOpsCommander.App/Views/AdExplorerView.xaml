@@ -1152,28 +1152,20 @@
                             </DataGrid>
                         </TabItem>
 
-                        <!-- Group Membership tab -->
+                        <!-- Group Membership tab (hidden for group objects) -->
                         <TabItem Header="Groups"
                                  AutomationProperties.Name="Group Membership Tab">
-                            <DockPanel>
-                                <Button DockPanel.Dock="Top"
-                                        Content="Show all members"
-                                        Command="{Binding ShowGroupMembersCommand}"
-                                        Margin="4,4,4,2"
-                                        Padding="8,4"
-                                        HorizontalAlignment="Left"
-                                        AutomationProperties.Name="Show Group Members Button">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                            <TabItem.Style>
+                                <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedObject.ObjectClass}" Value="group">
                                             <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding SelectedObject.ObjectClass}" Value="group">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TabItem.Style>
+                            <DockPanel>
                                 <!-- Group filter search bar -->
                                 <TextBox DockPanel.Dock="Top"
                                          Text="{Binding GroupFilterText, UpdateSourceTrigger=PropertyChanged}"
@@ -1210,6 +1202,60 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </TabItem>
+
+                        <!-- Group Members tab (only visible for group objects) -->
+                        <TabItem Header="Members"
+                                 AutomationProperties.Name="Group Members Tab">
+                            <TabItem.Style>
+                                <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedObject.ObjectClass}" Value="group">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TabItem.Style>
+                            <DockPanel>
+                                <!-- Member filter search bar -->
+                                <TextBox DockPanel.Dock="Top"
+                                         Text="{Binding MembersFilterText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ThemedTextBoxStyle}"
+                                         Margin="4,4,4,2"
+                                         AutomationProperties.Name="Member Filter">
+                                    <TextBox.Tag>
+                                        <sys:String>Filter members...</sys:String>
+                                    </TextBox.Tag>
+                                </TextBox>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding FilteredMembers}"
+                                                  AutomationProperties.Name="Group Members List">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding Name, Mode=OneWay}"
+                                                         IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                         Background="Transparent" BorderThickness="0"
+                                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                                         Padding="4,3">
+                                                    <TextBox.ToolTip>
+                                                        <ToolTip Style="{StaticResource ThemedToolTipStyle}"
+                                                                 Content="{Binding DistinguishedName}" />
+                                                    </TextBox.ToolTip>
+                                                    <TextBox.ContextMenu>
+                                                        <ContextMenu Style="{StaticResource ThemedContextMenuStyle}">
+                                                            <MenuItem Header="Show group members"
+                                                                      Tag="{Binding DistinguishedName}"
+                                                                      Click="ShowGroupMembersFromList_Click"
+                                                                      AutomationProperties.Name="Show Members Of This Group" />
+                                                        </ContextMenu>
+                                                    </TextBox.ContextMenu>
+                                                </TextBox>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </ScrollViewer>
                             </DockPanel>
                         </TabItem>
