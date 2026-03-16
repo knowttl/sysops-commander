@@ -9,22 +9,29 @@
 *.user
 *.suo
 *.userosscache
+*.cache
+*.rsuser
+launchSettings.json
 
 # NuGet
 [Pp]ackages/
 *.nupkg
 *.snupkg
+project.lock.json
+project.fragment.lock.json
 
 # Test results
 [Tt]est[Rr]esults/
 coverage*.xml
 coverage*.json
+*.coveragexml
 
 # Benchmarks
 BenchmarkDotNet.Artifacts/
 
-# Publish
+# Publish / deploy output
 publish/
+**/PublishProfiles/
 
 # SQLite runtime databases
 *.db
@@ -35,10 +42,20 @@ publish/
 *.log
 *.zip
 *.swp
+*.tmp
+*~
 Thumbs.db
 Desktop.ini
 .DS_Store
+ehthumbs.db
 
 # Rider / JetBrains
 .idea/
 *.DotSettings.user
+
+# NCrunch
+*.ncrunch*
+_NCrunch_*
+
+# Stale icon source files (only Assets/app-icon.ico should be tracked)
+falcon_*.ico
