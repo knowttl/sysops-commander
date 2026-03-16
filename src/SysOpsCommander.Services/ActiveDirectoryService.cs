@@ -378,6 +378,29 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
     }
 
     /// <inheritdoc />
+    public async Task<AdSearchResult> SearchOusAsync(
+        string searchTerm,
+        string? baseDn,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(searchTerm);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        bool hasWildcard = searchTerm.Contains('*');
+        string sanitized = hasWildcard
+            ? LdapFilterSanitizer.SanitizePreservingWildcards(searchTerm)
+            : LdapFilterSanitizer.SanitizeInput(searchTerm);
+
+        string wrap = hasWildcard ? string.Empty : "*";
+        string filter = $"(&(objectClass=organizationalUnit)(|(ou={wrap}{sanitized}{wrap})(name={wrap}{sanitized}{wrap})(description={wrap}{sanitized}{wrap})))";
+
+        string effectiveBaseDn = baseDn ?? GetActiveDomain().RootDistinguishedName;
+
+        return await ExecuteSearchAsync(filter, searchTerm, effectiveBaseDn, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<AdSearchResult> GetGroupMembersAsync(
         string groupDn,
         bool recursive,
@@ -566,12 +589,25 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
         if (objectClasses.Count == 1)
         {
-            return $"(objectClass={LdapFilterSanitizer.SanitizeInput(objectClasses[0])})";
+            return BuildSingleClassFilter(objectClasses[0]);
         }
 
-        string orClauses = string.Concat(objectClasses.Select(c =>
-            $"(objectClass={LdapFilterSanitizer.SanitizeInput(c)})"));
+        string orClauses = string.Concat(objectClasses.Select(BuildSingleClassFilter));
         return $"(|{orClauses})";
+    }
+
+    /// <summary>
+    /// Builds an LDAP filter for a single object class, applying special handling
+    /// for "user" to exclude computer objects (computer is a subclass of user in AD).
+    /// </summary>
+    private static string BuildSingleClassFilter(string objectClass)
+    {
+        string sanitized = LdapFilterSanitizer.SanitizeInput(objectClass);
+
+        // In AD, computer inherits from user — exclude computers when filtering for users only
+        return string.Equals(objectClass, "user", StringComparison.OrdinalIgnoreCase)
+            ? $"(&(objectClass={sanitized})(!(objectClass=computer)))"
+            : $"(objectClass={sanitized})";
     }
 
     private void ThrowIfDisposed() =>

@@ -124,6 +124,16 @@ public interface IActiveDirectoryService
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Searches for organizational units matching the specified search term.
+    /// Uses OU-appropriate attributes (ou, name, description) for matching.
+    /// </summary>
+    /// <param name="searchTerm">The search term to match against OU attributes.</param>
+    /// <param name="baseDn">The base distinguished name to scope the search, or <see langword="null"/> for domain root.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The search results containing matching organizational units.</returns>
+    Task<AdSearchResult> SearchOusAsync(string searchTerm, string? baseDn, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Gets the members of a specified group.
     /// </summary>
     /// <param name="groupDn">The distinguished name of the group.</param>

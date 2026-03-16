@@ -353,6 +353,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                 string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
                 result = await _adService.SearchWithFilterAsync(RawLdapFilter, baseDn, _cts.Token);
             }
+            else if (FilterOus)
+            {
+                string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
+                result = await _adService.SearchOusAsync(SearchText, baseDn, _cts.Token);
+            }
             else
             {
                 string? attribute = SelectedAttribute == "All attributes" ? null : SelectedAttribute;
@@ -394,7 +399,6 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         if (FilterUsers) { filters.Add("user"); }
         if (FilterComputers) { filters.Add("computer"); }
         if (FilterGroups) { filters.Add("group"); }
-        if (FilterOus) { filters.Add("organizationalUnit"); }
         return filters.Count > 0 ? filters : null;
     }
 
@@ -599,8 +603,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
     /// <summary>
     /// Toggles a specific object class filter pill.
+    /// OUs are exclusive — selecting OUs deselects other filters, and selecting other filters deselects OUs.
     /// </summary>
-    /// <param name="objectClass">The object class filter to toggle (Users, Computers, Groups, OUs, Contacts, All).</param>
+    /// <param name="objectClass">The object class filter to toggle (Users, Computers, Groups, OUs, All).</param>
     [RelayCommand]
     private void ToggleFilter(string? objectClass)
     {
@@ -619,10 +624,29 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
         switch (objectClass)
         {
-            case "user": FilterUsers = !FilterUsers; break;
-            case "computer": FilterComputers = !FilterComputers; break;
-            case "group": FilterGroups = !FilterGroups; break;
-            case "organizationalUnit": FilterOus = !FilterOus; break;
+            case "organizationalUnit":
+                // OUs are exclusive — deselect all other filters
+                FilterOus = !FilterOus;
+                if (FilterOus)
+                {
+                    FilterUsers = false;
+                    FilterComputers = false;
+                    FilterGroups = false;
+                }
+
+                break;
+            case "user":
+                FilterUsers = !FilterUsers;
+                FilterOus = false;
+                break;
+            case "computer":
+                FilterComputers = !FilterComputers;
+                FilterOus = false;
+                break;
+            case "group":
+                FilterGroups = !FilterGroups;
+                FilterOus = false;
+                break;
             default: break;
         }
 
