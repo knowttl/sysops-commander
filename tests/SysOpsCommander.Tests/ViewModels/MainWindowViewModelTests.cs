@@ -177,6 +177,7 @@ public sealed class MainWindowViewModelTests
 
         _viewModel.CurrentDomainName.Should().Be("new.domain.com");
         _viewModel.ConnectionStatus.Should().Be("Connected");
+        _viewModel.SelectedDomain!.DomainName.Should().Be("new.domain.com");
     }
 
     [Fact]
@@ -201,6 +202,84 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task DomainSwitch_WhenTimesOut_ShowsTimeoutError()
+    {
+        _adService.SetActiveDomainAsync(Arg.Any<DomainConnection>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new OperationCanceledException());
+
+        DomainConnection slowDomain = new()
+        {
+            DomainName = "slow.domain.com",
+            RootDistinguishedName = "DC=slow,DC=domain,DC=com"
+        };
+
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedDomain = slowDomain;
+
+        await Task.Delay(100);
+
+        _viewModel.CurrentDomainName.Should().Be("test.local");
+        _viewModel.ConnectionStatus.Should().Be("Connected");
+        _viewModel.IsBusy.Should().BeFalse();
+        _dialogService.Received().ShowError(
+            Arg.Is<string>(s => s.Contains("Timed Out")),
+            Arg.Is<string>(s => s.Contains("slow.domain.com")));
+    }
+
+    [Fact]
+    public async Task DomainSwitch_WhenFails_RestoresPreviousDomain()
+    {
+        await _viewModel.InitializeAsync();
+
+        DomainConnection newDomain = new()
+        {
+            DomainName = "new.domain.com",
+            RootDistinguishedName = "DC=new,DC=domain,DC=com"
+        };
+
+        _viewModel.SelectedDomain = newDomain;
+        await Task.Delay(100);
+
+        _viewModel.CurrentDomainName.Should().Be("new.domain.com");
+
+        _adService.SetActiveDomainAsync(Arg.Any<DomainConnection>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("Failed"));
+
+        _adService.GetActiveDomain().Returns(newDomain);
+
+        DomainConnection badDomain = new()
+        {
+            DomainName = "bad.domain.com",
+            RootDistinguishedName = "DC=bad,DC=domain,DC=com"
+        };
+
+        _viewModel.SelectedDomain = badDomain;
+        await Task.Delay(100);
+
+        _viewModel.CurrentDomainName.Should().Be("new.domain.com");
+        _viewModel.SelectedDomain.Should().Be(newDomain);
+        _viewModel.IsBusy.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DomainSwitch_ClearsBusyState_AfterSuccess()
+    {
+        DomainConnection newDomain = new()
+        {
+            DomainName = "new.domain.com",
+            RootDistinguishedName = "DC=new,DC=domain,DC=com"
+        };
+
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedDomain = newDomain;
+
+        await Task.Delay(100);
+
+        _viewModel.IsBusy.Should().BeFalse();
+        _viewModel.BusyMessage.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task OpenDomainSelector_WhenDomainSelected_SwitchesDomain()
     {
         DomainConnection selectedDomain = new()
@@ -210,9 +289,29 @@ public sealed class MainWindowViewModelTests
         };
         _dialogService.ShowDomainSelectorAsync().Returns(selectedDomain);
 
+        await _viewModel.InitializeAsync();
         await _viewModel.OpenDomainSelectorCommand.ExecuteAsync(null);
 
         _viewModel.CurrentDomainName.Should().Be("selected.domain.com");
+        _viewModel.SelectedDomain!.DomainName.Should().Be("selected.domain.com");
+        _viewModel.AvailableDomains.Should().Contain(d => d.DomainName == "selected.domain.com");
+    }
+
+    [Fact]
+    public async Task OpenDomainSelector_OriginalDomainRemainsInDropdown()
+    {
+        DomainConnection selectedDomain = new()
+        {
+            DomainName = "other.domain.com",
+            RootDistinguishedName = "DC=other,DC=domain,DC=com"
+        };
+        _dialogService.ShowDomainSelectorAsync().Returns(selectedDomain);
+
+        await _viewModel.InitializeAsync();
+        await _viewModel.OpenDomainSelectorCommand.ExecuteAsync(null);
+
+        _viewModel.AvailableDomains.Should().Contain(d => d.DomainName == "test.local");
+        _viewModel.AvailableDomains.Should().Contain(d => d.DomainName == "other.domain.com");
     }
 
     [Fact]

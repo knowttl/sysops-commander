@@ -289,10 +289,41 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            await _adService.SetActiveDomainAsync(domain, CancellationToken.None);
+            using CancellationTokenSource switchCts = new(TimeSpan.FromSeconds(AppConstants.DomainSwitchTimeoutSeconds));
+            await _adService.SetActiveDomainAsync(domain, switchCts.Token);
             CurrentDomainName = domain.DomainName;
             ConnectionStatus = "Connected";
             Log.Information("Switched active domain to {DomainName}", domain.DomainName);
+
+            // Ensure the new domain appears in the dropdown and is selected
+            if (!AvailableDomains.Any(d => string.Equals(d.DomainName, domain.DomainName, StringComparison.OrdinalIgnoreCase)))
+            {
+                AvailableDomains.Add(domain);
+            }
+
+            _isInitializing = true;
+            SelectedDomain = AvailableDomains.FirstOrDefault(
+                d => string.Equals(d.DomainName, domain.DomainName, StringComparison.OrdinalIgnoreCase)) ?? domain;
+            _isInitializing = false;
+
+            // Refresh the active view so it reflects the new domain
+            if (CurrentView is IRefreshable refreshable)
+            {
+                await refreshable.RefreshAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Warning("Domain switch to {DomainName} timed out after {Seconds}s", domain.DomainName, AppConstants.DomainSwitchTimeoutSeconds);
+
+            _isInitializing = true;
+            SelectedDomain = previousDomain;
+            CurrentDomainName = previousDomain.DomainName;
+            _isInitializing = false;
+
+            ConnectionStatus = "Connected";
+
+            _dialogService.ShowError("Domain Switch Timed Out", $"Connection to {domain.DomainName} timed out after {AppConstants.DomainSwitchTimeoutSeconds} seconds.");
         }
         catch (Exception ex)
         {

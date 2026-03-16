@@ -143,6 +143,24 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private ObservableCollection<string> _filteredGroups = [];
 
     /// <summary>
+    /// Gets or sets the members of the selected group object.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<AdObject> _selectedObjectMembers = [];
+
+    /// <summary>
+    /// Gets or sets the filter text for the members tab search bar.
+    /// </summary>
+    [ObservableProperty]
+    private string _membersFilterText = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the filtered members list for the inspector Members tab.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<AdObject> _filteredMembers = [];
+
+    /// <summary>
     /// Gets or sets whether the column picker popup is open.
     /// </summary>
     [ObservableProperty]
@@ -725,12 +743,13 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         if (value is not null)
         {
-            LoadObjectDetailAsync(value.DistinguishedName).SafeFireAndForget(_logger);
+            LoadObjectDetailAsync(value.DistinguishedName, value.ObjectClass).SafeFireAndForget(_logger);
         }
         else
         {
             SelectedObjectAttributes.Clear();
             SelectedObjectGroups.Clear();
+            SelectedObjectMembers.Clear();
             SelectedObjectPermissions.Clear();
         }
     }
@@ -761,23 +780,44 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
     }
 
-    private async Task LoadObjectDetailAsync(string dn)
+    private async Task LoadObjectDetailAsync(string dn, string objectClass)
     {
+        bool isGroup = objectClass.Equals("group", StringComparison.OrdinalIgnoreCase);
+
         try
         {
             Task<AdObject> detailTask = _adService.GetObjectDetailAsync(dn, _cts.Token);
-            Task<IReadOnlyList<string>> groupsTask = _adService.GetGroupMembershipAsync(
-                dn, recursive: false, _cts.Token);
             Task<IReadOnlyList<AdAccessControlEntry>> aclTask = _adService.GetObjectAclAsync(dn, _cts.Token);
-            await Task.WhenAll(detailTask, groupsTask, aclTask);
 
-            SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
-                detailTask.Result.Attributes
-                    .OrderBy(a => a.Key)
-                    .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
+            if (isGroup)
+            {
+                Task<AdSearchResult> membersTask = _adService.GetGroupMembersAsync(dn, recursive: false, _cts.Token);
+                await Task.WhenAll(detailTask, membersTask, aclTask);
 
-            SelectedObjectGroups = new ObservableCollection<string>(
-                groupsTask.Result.Distinct(StringComparer.OrdinalIgnoreCase));
+                SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
+                    detailTask.Result.Attributes
+                        .OrderBy(a => a.Key)
+                        .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
+
+                SelectedObjectGroups = [];
+                SelectedObjectMembers = new ObservableCollection<AdObject>(
+                    membersTask.Result.Results.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase));
+            }
+            else
+            {
+                Task<IReadOnlyList<string>> groupsTask = _adService.GetGroupMembershipAsync(
+                    dn, recursive: false, _cts.Token);
+                await Task.WhenAll(detailTask, groupsTask, aclTask);
+
+                SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
+                    detailTask.Result.Attributes
+                        .OrderBy(a => a.Key)
+                        .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
+
+                SelectedObjectGroups = new ObservableCollection<string>(
+                    groupsTask.Result.Distinct(StringComparer.OrdinalIgnoreCase));
+                SelectedObjectMembers = [];
+            }
 
             SelectedObjectPermissions = new ObservableCollection<AdAccessControlEntry>(aclTask.Result);
         }
@@ -1492,6 +1532,43 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         GroupFilterText = string.Empty;
         FilteredGroups = new ObservableCollection<string>(value);
+    }
+
+    partial void OnMembersFilterTextChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            FilteredMembers = new ObservableCollection<AdObject>(SelectedObjectMembers);
+        }
+        else
+        {
+            FilteredMembers = new ObservableCollection<AdObject>(
+                SelectedObjectMembers.Where(m =>
+                    m.Name.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                    m.ObjectClass.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                    (m.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) ?? false)));
+        }
+    }
+
+    partial void OnSelectedObjectMembersChanged(ObservableCollection<AdObject> value)
+    {
+        MembersFilterText = string.Empty;
+        FilteredMembers = new ObservableCollection<AdObject>(value);
+    }
+
+    /// <summary>
+    /// Navigates the inspector to the specified group member, loading its details as the selected object.
+    /// </summary>
+    /// <param name="member">The AD object to inspect.</param>
+    [RelayCommand]
+    private void NavigateToMember(AdObject? member)
+    {
+        if (member is null)
+        {
+            return;
+        }
+
+        SelectedObject = member;
     }
 
     private void PushSearchState()

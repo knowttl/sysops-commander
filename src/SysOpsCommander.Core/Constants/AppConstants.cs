@@ -31,6 +31,11 @@ public static class AppConstants
     public const int DefaultAdQueryTimeoutSeconds = 30;
 
     /// <summary>
+    /// The timeout in seconds for domain switch operations (LDAP bind validation).
+    /// </summary>
+    public const int DomainSwitchTimeoutSeconds = 15;
+
+    /// <summary>
     /// The maximum number of results returned per paginated query.
     /// </summary>
     public const int MaxResultsPerPage = 500;

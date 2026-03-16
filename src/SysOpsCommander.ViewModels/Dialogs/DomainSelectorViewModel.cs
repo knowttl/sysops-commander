@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SysOpsCommander.Core.Constants;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
 
@@ -74,7 +75,8 @@ public partial class DomainSelectorViewModel : ObservableObject
                 RootDistinguishedName = ConvertDomainToDistinguishedName(DomainName),
                 IsCurrentDomain = false
             };
-            await _adService.SetActiveDomainAsync(domain, CancellationToken.None);
+            using CancellationTokenSource testCts = new(TimeSpan.FromSeconds(AppConstants.DomainSwitchTimeoutSeconds));
+            await _adService.SetActiveDomainAsync(domain, testCts.Token);
             TestStatus = "✓ Connected successfully";
             IsTestSuccessful = true;
         }
