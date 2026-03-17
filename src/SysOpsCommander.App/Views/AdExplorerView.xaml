@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:vm="clr-namespace:SysOpsCommander.ViewModels;assembly=SysOpsCommander.ViewModels"
+             xmlns:enums="clr-namespace:SysOpsCommander.Core.Enums;assembly=SysOpsCommander.Core"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1200"
              d:DataContext="{d:DesignInstance Type=vm:AdExplorerViewModel}"
@@ -776,8 +777,46 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Distinguished Name" Width="2*" SortMemberPath="DistinguishedName"
+                                <DataGridTemplateColumn Header="IP Address" Width="120" SortMemberPath="IpAddress"
                                                         Visibility="{Binding DataContext.DataGridColumns[3].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Padding="4,2" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="{Binding IpAddress}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                                        <Setter Property="ToolTip">
+                                                            <Setter.Value>
+                                                                <ToolTip Style="{StaticResource ThemedToolTipStyle}"
+                                                                         Content="{Binding IpTooltip}" />
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IpResolutionStatus}" Value="{x:Static enums:IpResolutionStatus.Resolving}">
+                                                                <Setter Property="FontStyle" Value="Italic" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IpResolutionStatus}" Value="{x:Static enums:IpResolutionStatus.Failed}">
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IpResolutionStatus}" Value="{x:Static enums:IpResolutionStatus.NotApplicable}">
+                                                                <Setter Property="Text" Value="" />
+                                                                <Setter Property="ToolTip" Value="{x:Null}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IpResolutionStatus}" Value="{x:Static enums:IpResolutionStatus.NotStarted}">
+                                                                <Setter Property="Text" Value="" />
+                                                                <Setter Property="ToolTip" Value="{x:Null}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Distinguished Name" Width="2*" SortMemberPath="DistinguishedName"
+                                                        Visibility="{Binding DataContext.DataGridColumns[4].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding DistinguishedName, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
@@ -1023,6 +1062,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
@@ -1103,8 +1143,88 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- IP Addresses section (computer objects only) -->
+                    <Border Grid.Row="2" Padding="8,6"
+                            Background="{DynamicResource Surface2Brush}"
+                            Margin="4,4,4,0"
+                            CornerRadius="4">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding SelectedObject.IsComputer}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="IP Addresses"
+                                       Style="{StaticResource LabelStyle}"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,4" />
+                            <!-- Resolving indicator -->
+                            <TextBlock Text="Resolving..."
+                                       FontStyle="Italic">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource LabelStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedObject.IpResolutionStatus}"
+                                                         Value="{x:Static enums:IpResolutionStatus.Resolving}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <!-- Failed message -->
+                            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedObject.IpResolutionStatus}"
+                                                         Value="{x:Static enums:IpResolutionStatus.Failed}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                                <Run Text="Unable to resolve — " />
+                                <Run Text="{Binding SelectedObject.IpTooltip, Mode=OneWay}" />
+                            </TextBlock>
+                            <!-- Resolved addresses -->
+                            <ItemsControl ItemsSource="{Binding SelectedObject.AllIpAddresses}">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedObject.IpResolutionStatus}"
+                                                         Value="{x:Static enums:IpResolutionStatus.Resolved}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}"
+                                                   Style="{StaticResource MonoStyle}"
+                                                   FontSize="12"
+                                                   Padding="0,1" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Detail content: Attributes + Group Membership tabs -->
-                    <TabControl Grid.Row="2"
+                    <TabControl Grid.Row="3"
                                 Margin="4,4,4,4">
                         <TabControl.Style>
                             <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">

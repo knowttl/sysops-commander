@@ -29,6 +29,7 @@ public sealed class MainWindowViewModelTests
         services.AddSingleton(Substitute.For<IRemoteExecutionService>());
         services.AddSingleton(Substitute.For<IScriptLoaderService>());
         services.AddSingleton(Substitute.For<IExportService>());
+        services.AddSingleton(Substitute.For<IDnsResolverService>());
         services.AddSingleton(_dialogService);
         services.AddSingleton(_autoUpdateService);
         services.AddSingleton(Substitute.For<ILogger>());

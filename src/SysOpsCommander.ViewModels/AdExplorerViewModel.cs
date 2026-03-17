@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using SysOpsCommander.Core.Constants;
+using SysOpsCommander.Core.Enums;
 using SysOpsCommander.Core.Extensions;
 using SysOpsCommander.Core.Interfaces;
 using SysOpsCommander.Core.Models;
@@ -23,10 +24,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private readonly ISettingsService _settingsService;
     private readonly IDialogService _dialogService;
     private readonly IExportService _exportService;
+    private readonly IDnsResolverService _dnsResolverService;
     private readonly ILogger _logger;
     private CancellationTokenSource? _searchDebounceTimer;
     private CancellationTokenSource? _treeFilterDebounceTimer;
     private CancellationTokenSource? _searchCts;
+    private CancellationTokenSource? _dnsResolutionCts;
     private readonly CancellationTokenSource _cts = new();
     private bool _isRefreshing;
 
@@ -40,10 +43,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private ObservableCollection<AdTreeNode> _treeNodes = [];
 
     [ObservableProperty]
-    private ObservableCollection<AdObject> _searchResults = [];
+    private ObservableCollection<AdObjectRow> _searchResults = [];
 
     [ObservableProperty]
-    private AdObject? _selectedObject;
+    private AdObjectRow? _selectedObject;
 
     [ObservableProperty]
     private ObservableCollection<KeyValuePair<string, string>> _selectedObjectAttributes = [];
@@ -224,6 +227,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// <param name="settingsService">The settings service for configurable thresholds.</param>
     /// <param name="dialogService">The dialog service for user notifications.</param>
     /// <param name="exportService">The export service for CSV/Excel output.</param>
+    /// <param name="dnsResolverService">The DNS resolver service for IP address resolution.</param>
     /// <param name="logger">The Serilog logger.</param>
     public AdExplorerViewModel(
         IActiveDirectoryService adService,
@@ -231,6 +235,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         ISettingsService settingsService,
         IDialogService dialogService,
         IExportService exportService,
+        IDnsResolverService dnsResolverService,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(adService);
@@ -238,6 +243,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(dialogService);
         ArgumentNullException.ThrowIfNull(exportService);
+        ArgumentNullException.ThrowIfNull(dnsResolverService);
         ArgumentNullException.ThrowIfNull(logger);
 
         _adService = adService;
@@ -245,6 +251,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _settingsService = settingsService;
         _dialogService = dialogService;
         _exportService = exportService;
+        _dnsResolverService = dnsResolverService;
         _logger = logger;
 
         InitializeDataGridColumns();
@@ -397,8 +404,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             // Only apply results if this search wasn't cancelled while awaiting
             searchToken.ThrowIfCancellationRequested();
 
-            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            SearchResults = new ObservableCollection<AdObjectRow>(
+                result.Results.Select(o => new AdObjectRow(o)));
             ResultStatus = $"{result.TotalResultCount} results found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
+
+            ResolveIpAddressesForResults();
 
             await RecordSearchHistoryAsync(queryText, result.TotalResultCount);
         }
@@ -494,13 +504,15 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         try
         {
             IReadOnlyList<string> dcs = await _adService.GetDomainControllersAsync(_cts.Token);
-            SearchResults = new ObservableCollection<AdObject>(dcs.Select(dc => new AdObject
+            SearchResults = new ObservableCollection<AdObjectRow>(dcs.Select(dc => new AdObjectRow(new AdObject
             {
                 Name = dc,
                 DistinguishedName = dc,
                 ObjectClass = "computer",
                 DisplayName = dc
-            }));
+            })));
+
+            ResolveIpAddressesForResults();
 
             ResultStatus = $"{dcs.Count} domain controllers found";
         }
@@ -527,6 +539,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         var computers = SearchResults
             .Where(o => o.ObjectClass.Equals("computer", StringComparison.OrdinalIgnoreCase))
+            .Select(o => o.AdObject)
             .ToList();
 
         if (computers.Count == 0)
@@ -561,7 +574,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             AdSearchResult result = await _adService.GetGroupMembersAsync(
                 SelectedObject.DistinguishedName, recursive: true, _cts.Token);
 
-            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            SearchResults = new ObservableCollection<AdObjectRow>(
+                result.Results.Select(o => new AdObjectRow(o)));
+
+            ResolveIpAddressesForResults();
+
             ResultStatus = $"{result.TotalResultCount} members found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
         }
         catch (OperationCanceledException)
@@ -750,7 +767,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         BreadcrumbSegments = segments;
     }
 
-    partial void OnSelectedObjectChanged(AdObject? value)
+    partial void OnSelectedObjectChanged(AdObjectRow? value)
     {
         if (value is not null)
         {
@@ -859,7 +876,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         try
         {
             AdSearchResult result = await filterFunc(_cts.Token);
-            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            SearchResults = new ObservableCollection<AdObjectRow>(
+                result.Results.Select(o => new AdObjectRow(o)));
+
+            ResolveIpAddressesForResults();
 
             ResultStatus = $"{result.TotalResultCount} {filterName} found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
         }
@@ -1215,7 +1235,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             AdSearchResult result = await _adService.GetGroupMembersAsync(
                 groupDn, recursive: true, _cts.Token);
 
-            SearchResults = new ObservableCollection<AdObject>(result.Results);
+            SearchResults = new ObservableCollection<AdObjectRow>(
+                result.Results.Select(o => new AdObjectRow(o)));
+
+            ResolveIpAddressesForResults();
+
             ResultStatus = $"{result.TotalResultCount} members found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
         }
         catch (OperationCanceledException)
@@ -1248,7 +1272,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _undoStack.RemoveAt(_undoStack.Count - 1);
         CanGoBack = _undoStack.Count > 0;
 
-        SearchResults = snapshot.Results;
+        SearchResults = new ObservableCollection<AdObjectRow>(
+            snapshot.Results.Select(o => new AdObjectRow(o)));
+
+        ResolveIpAddressesForResults();
+
         ResultStatus = snapshot.ResultStatus;
         SearchText = snapshot.SearchText;
         SelectedAttribute = snapshot.SelectedAttribute;
@@ -1315,7 +1343,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             return;
         }
 
-        List<AdObject> objects = [.. SearchResults];
+        List<AdObject> objects = [.. SearchResults.Select(r => r.AdObject)];
 
         if (_pendingExportFormat == "csv")
         {
@@ -1386,9 +1414,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         var sb = new StringBuilder();
         _ = sb.AppendLine("Name\tObjectClass\tDescription\tDistinguishedName");
 
-        foreach (AdObject obj in SearchResults)
+        foreach (AdObjectRow row in SearchResults)
         {
-            _ = sb.Append(CultureInfo.InvariantCulture, $"{obj.Name}\t{obj.ObjectClass}\t{obj.Description ?? string.Empty}\t{obj.DistinguishedName}")
+            _ = sb.Append(CultureInfo.InvariantCulture, $"{row.Name}\t{row.ObjectClass}\t{row.Description ?? string.Empty}\t{row.DistinguishedName}")
                   .AppendLine();
         }
 
@@ -1414,9 +1442,9 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             "DistinguishedName"
         };
 
-        foreach (AdObject obj in SearchResults)
+        foreach (AdObjectRow row in SearchResults)
         {
-            foreach (string key in obj.Attributes.Keys)
+            foreach (string key in row.Attributes.Keys)
             {
                 _ = columns.Add(key);
             }
@@ -1548,6 +1576,52 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
     }
 
+    private void ResolveIpAddressesForResults()
+    {
+        _dnsResolutionCts?.Cancel();
+        _dnsResolutionCts?.Dispose();
+        _dnsResolutionCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        CancellationToken dnsToken = _dnsResolutionCts.Token;
+
+        var computerRows = SearchResults
+            .Where(r => r.IsComputer && !string.IsNullOrWhiteSpace(r.DnsHostName))
+            .ToList();
+
+        if (computerRows.Count == 0)
+        {
+            return;
+        }
+
+        foreach (AdObjectRow row in computerRows)
+        {
+            row.UpdateFromResolutionResult(new IpResolutionResult
+            {
+                Status = IpResolutionStatus.Resolving,
+                Hostname = row.DnsHostName
+            });
+        }
+
+        var requests = computerRows
+            .Select(row => (row.DnsHostName!, (Action<IpResolutionResult>)row.UpdateFromResolutionResult))
+            .ToList();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _dnsResolverService.ResolveAllAsync(requests, dnsToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Resolution cancelled — expected on new search
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning(ex, "DNS resolution batch failed");
+            }
+        }, dnsToken);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -1557,6 +1631,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _treeFilterDebounceTimer?.Dispose();
         _searchCts?.Cancel();
         _searchCts?.Dispose();
+        _dnsResolutionCts?.Cancel();
+        _dnsResolutionCts?.Dispose();
         _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
@@ -1615,13 +1691,13 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             return;
         }
 
-        SelectedObject = member;
+        SelectedObject = new AdObjectRow(member);
     }
 
     private void PushSearchState()
     {
         _undoStack.Add(new SearchStateSnapshot(
-            new ObservableCollection<AdObject>(SearchResults),
+            SearchResults.Select(r => r.AdObject).ToList(),
             ResultStatus,
             SearchText,
             SelectedAttribute,
@@ -1650,6 +1726,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             new DataGridColumnConfig { Header = "Name", PropertyName = "Name" },
             new DataGridColumnConfig { Header = "Class", PropertyName = "ObjectClass" },
             new DataGridColumnConfig { Header = "Description", PropertyName = "Description" },
+            new DataGridColumnConfig { Header = "IP Address", PropertyName = "IpAddress" },
             new DataGridColumnConfig { Header = "Distinguished Name", PropertyName = "DistinguishedName" }
         ];
     }
