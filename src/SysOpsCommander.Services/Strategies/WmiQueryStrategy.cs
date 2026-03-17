@@ -59,7 +59,7 @@ public sealed class WmiQueryStrategy : IExecutionStrategy
             await Task.Run(scope.Connect, cancellationToken).ConfigureAwait(false);
 
             using ManagementObjectSearcher searcher = new(scope, new ObjectQuery(scriptContent));
-            ManagementObjectCollection results =
+            using ManagementObjectCollection results =
                 await Task.Run(() => searcher.Get(), cancellationToken).ConfigureAwait(false);
 
             stopwatch.Stop();
@@ -145,15 +145,25 @@ public sealed class WmiQueryStrategy : IExecutionStrategy
 
     private static string FormatWmiResults(ManagementObjectCollection results)
     {
+        const int maxOutputLength = 10_000_000;
         var sb = new StringBuilder();
         foreach (ManagementBaseObject obj in results)
         {
-            foreach (PropertyData prop in obj.Properties)
+            using (obj)
             {
-                _ = sb.Append(prop.Name).Append(" = ").AppendLine(prop.Value?.ToString());
-            }
+                foreach (PropertyData prop in obj.Properties)
+                {
+                    _ = sb.Append(prop.Name).Append(" = ").AppendLine(prop.Value?.ToString());
+                }
 
-            _ = sb.AppendLine("---");
+                _ = sb.AppendLine("---");
+
+                if (sb.Length > maxOutputLength)
+                {
+                    _ = sb.Append("... [OUTPUT TRUNCATED]");
+                    return sb.ToString();
+                }
+            }
         }
 
         return sb.ToString().TrimEnd();

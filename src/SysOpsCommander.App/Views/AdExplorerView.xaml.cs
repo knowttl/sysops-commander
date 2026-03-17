@@ -29,6 +29,8 @@ public partial class AdExplorerView : UserControl
 
         _ = InputBindings.Add(new KeyBinding(new RelayFocusCommand(SearchTextBox), Key.F, ModifierKeys.Control));
         _ = InputBindings.Add(new KeyBinding(new RelayFocusCommand(TreeFilterTextBox), Key.L, ModifierKeys.Control));
+
+        SearchTextBox.PreviewKeyDown += OnSearchTextBoxKeyDown;
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -153,6 +155,15 @@ public partial class AdExplorerView : UserControl
         if (e.NewValue is AdTreeNode node && DataContext is AdExplorerViewModel vm)
         {
             vm.SetScopeCommand.Execute(node.DistinguishedName);
+        }
+    }
+
+    private void OnSearchTextBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DataContext is AdExplorerViewModel vm)
+        {
+            vm.SearchCommand.Execute(null);
+            e.Handled = true;
         }
     }
 

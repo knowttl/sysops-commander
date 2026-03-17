@@ -168,6 +168,92 @@ public sealed class ScriptValidationServiceTests : IDisposable
         warnings.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task ValidateScriptFullAsync_ValidScriptWithManifest_ReturnsCombinedResult()
+    {
+        string scriptPath = CreateTempScript("param([string]$ComputerName)\nGet-Process");
+        var manifest = new ScriptManifest
+        {
+            Name = "Test-Script",
+            Description = "Test script",
+            Version = "1.0.0",
+            Author = "Admin",
+            Category = "Diagnostics",
+            Parameters =
+            [
+                new ScriptParameter { Name = "ComputerName", Type = "string" }
+            ]
+        };
+
+        ScriptFullValidationResult result = await _service.ValidateScriptFullAsync(
+            scriptPath, manifest, CancellationToken.None);
+
+        result.SyntaxResult.IsValid.Should().BeTrue();
+        result.DangerousPatterns.Should().BeEmpty();
+        result.ManifestResult.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateScriptFullAsync_ParsesOnce_DetectsAllIssues()
+    {
+        string scriptPath = CreateTempScript("param([string]$ComputerName)\nStop-Computer -Force");
+        var manifest = new ScriptManifest
+        {
+            Name = "Test-Script",
+            Description = "Test script",
+            Version = "1.0.0",
+            Author = "Admin",
+            Category = "Diagnostics",
+            Parameters =
+            [
+                new ScriptParameter { Name = "ComputerName", Type = "string" },
+                new ScriptParameter { Name = "MissingParam", Type = "string" }
+            ]
+        };
+
+        ScriptFullValidationResult result = await _service.ValidateScriptFullAsync(
+            scriptPath, manifest, CancellationToken.None);
+
+        result.SyntaxResult.IsValid.Should().BeTrue();
+        result.DangerousPatterns.Should().ContainSingle(w => w.PatternName == "Stop-Computer");
+        result.ManifestResult.Warnings.Should().Contain(w => w.Contains("MissingParam") && w.Contains("not found in script"));
+    }
+
+    [Fact]
+    public async Task ValidateScriptFullAsync_NullManifest_ReturnsEmptyManifestResult()
+    {
+        string scriptPath = CreateTempScript("Get-Process");
+
+        ScriptFullValidationResult result = await _service.ValidateScriptFullAsync(
+            scriptPath, null, CancellationToken.None);
+
+        result.SyntaxResult.IsValid.Should().BeTrue();
+        result.ManifestResult.IsValid.Should().BeTrue();
+        result.ManifestResult.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ValidateScriptFullAsync_FileNotFound_ReturnsSyntaxError()
+    {
+        ScriptFullValidationResult result = await _service.ValidateScriptFullAsync(
+            Path.Combine(_tempDir, "nonexistent.ps1"), null, CancellationToken.None);
+
+        result.SyntaxResult.IsValid.Should().BeFalse();
+        result.SyntaxResult.Errors[0].Message.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task ValidateScriptFullAsync_SyntaxError_ReturnsInSyntaxResult()
+    {
+        string scriptPath = CreateTempScript("if ($true) {");
+
+        ScriptFullValidationResult result = await _service.ValidateScriptFullAsync(
+            scriptPath, null, CancellationToken.None);
+
+        result.SyntaxResult.IsValid.Should().BeFalse();
+        result.SyntaxResult.Errors.Should().NotBeEmpty();
+    }
+
     private string CreateTempScript(string content)
     {
         string path = Path.Combine(_tempDir, $"{Guid.NewGuid():N}.ps1");

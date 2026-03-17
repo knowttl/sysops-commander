@@ -51,9 +51,6 @@ public partial class App : Application
 
         _serviceProvider = services.BuildServiceProvider();
 
-        DatabaseInitializer databaseInitializer = _serviceProvider.GetRequiredService<DatabaseInitializer>();
-        databaseInitializer.InitializeAsync().GetAwaiter().GetResult();
-
         CheckPendingUpdate(_serviceProvider);
 
         MainWindow mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
@@ -65,8 +62,8 @@ public partial class App : Application
         ApplicationThemeManager.Apply(mainWindow);
         SystemThemeWatcher.Watch(mainWindow);
 
-        // Initialize ViewModel after window is shown to avoid blocking startup
-        viewModel.InitializeAsync().SafeFireAndForget();
+        // Initialize DB and ViewModel after window is shown to avoid blocking startup
+        InitializeAfterWindowShownAsync(_serviceProvider, viewModel).SafeFireAndForget();
     }
 
     /// <summary>
@@ -90,10 +87,37 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Initializes the database and ViewModel asynchronously after the main window is visible,
+    /// preventing a blocking <c>GetAwaiter().GetResult()</c> call from freezing the UI thread.
+    /// </summary>
+    private static async Task InitializeAfterWindowShownAsync(
+        IServiceProvider serviceProvider,
+        MainWindowViewModel viewModel)
+    {
+        try
+        {
+            DatabaseInitializer databaseInitializer = serviceProvider.GetRequiredService<DatabaseInitializer>();
+            await databaseInitializer.InitializeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Database initialization failed");
+        }
+
+        await viewModel.InitializeAsync().ConfigureAwait(false);
+    }
+
     /// <inheritdoc/>
     protected override void OnExit(ExitEventArgs e)
     {
         Log.Information("SysOps Commander shutting down");
+
+        if (_serviceProvider is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+
         Log.CloseAndFlush();
         base.OnExit(e);
     }

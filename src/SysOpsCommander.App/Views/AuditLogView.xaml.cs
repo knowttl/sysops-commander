@@ -19,9 +19,16 @@ public partial class AuditLogView : UserControl
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (DataContext is AuditLogViewModel vm)
+        try
         {
-            await vm.LoadAuditLogCommand.ExecuteAsync(null);
+            if (DataContext is AuditLogViewModel vm)
+            {
+                await vm.LoadAuditLogCommand.ExecuteAsync(null);
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to load audit log data on Loaded event");
         }
     }
 }

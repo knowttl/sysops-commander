@@ -35,6 +35,16 @@ public interface IScriptValidationService
     Task<ManifestValidationResult> ValidateManifestPairAsync(string ps1Path, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Performs single-pass validation: parses the script AST once and runs syntax checking,
+    /// dangerous pattern detection, and manifest parameter alignment in a single operation.
+    /// </summary>
+    /// <param name="scriptPath">The full path to the .ps1 script file.</param>
+    /// <param name="manifest">The pre-deserialized manifest, or <see langword="null"/> if none exists.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="ScriptFullValidationResult"/> containing all validation results.</returns>
+    Task<ScriptFullValidationResult> ValidateScriptFullAsync(string scriptPath, ScriptManifest? manifest, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Checks whether CredSSP authentication is available on a remote host.
     /// </summary>
     /// <param name="hostname">The target hostname to test.</param>

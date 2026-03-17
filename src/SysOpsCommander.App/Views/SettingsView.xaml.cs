@@ -19,9 +19,16 @@ public partial class SettingsView : UserControl
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (DataContext is SettingsViewModel vm)
+        try
         {
-            await vm.LoadSettingsCommand.ExecuteAsync(null);
+            if (DataContext is SettingsViewModel vm)
+            {
+                await vm.LoadSettingsCommand.ExecuteAsync(null);
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to load settings data on Loaded event");
         }
     }
 }

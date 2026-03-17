@@ -752,6 +752,9 @@ public sealed class AdExplorerViewModelTests : IDisposable
 
         _viewModel.TreeFilterText = "Fin";
 
+        // Tree filter uses a 200ms debounce — wait for it to apply
+        await Task.Delay(350);
+
         _viewModel.FilteredTreeNodes.Should().HaveCount(1);
         _viewModel.FilteredTreeNodes[0].Name.Should().Be("Finance");
     }

@@ -555,6 +555,10 @@ public partial class ExecutionViewModel : ObservableObject, IRefreshable, IDispo
 
     private void OnHostResultReceived(HostResult result)
     {
+        // Progress<T> captures SynchronizationContext at construction.
+        // Since ExecuteAsync is a [RelayCommand] invoked from the UI thread,
+        // the WPF DispatcherSynchronizationContext is captured and callbacks
+        // are marshaled to the UI thread automatically.
         Results.Add(result);
         CompletedHostCount = Results.Count;
         ExecutionProgress = $"{CompletedHostCount} / {TotalHostCount}";
