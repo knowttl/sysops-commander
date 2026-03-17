@@ -16,6 +16,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
     private readonly ISettingsService _settingsService = Substitute.For<ISettingsService>();
     private readonly IDialogService _dialogService = Substitute.For<IDialogService>();
     private readonly IExportService _exportService = Substitute.For<IExportService>();
+    private readonly IDnsResolverService _dnsResolverService = Substitute.For<IDnsResolverService>();
     private readonly ILogger _logger = Substitute.For<ILogger>();
     private readonly AdExplorerViewModel _viewModel;
 
@@ -33,6 +34,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
             _settingsService,
             _dialogService,
             _exportService,
+            _dnsResolverService,
             _logger);
     }
 
@@ -210,18 +212,18 @@ public sealed class AdExplorerViewModelTests : IDisposable
     [Fact]
     public void SendToExecutionTargets_AddsComputerObjects()
     {
-        _viewModel.SearchResults.Add(new AdObject
+        _viewModel.SearchResults.Add(new AdObjectRow(new AdObject
         {
             Name = "PC1",
             DistinguishedName = "CN=PC1,DC=test,DC=local",
             ObjectClass = "computer"
-        });
-        _viewModel.SearchResults.Add(new AdObject
+        }));
+        _viewModel.SearchResults.Add(new AdObjectRow(new AdObject
         {
             Name = "User1",
             DistinguishedName = "CN=User1,DC=test,DC=local",
             ObjectClass = "user"
-        });
+        }));
 
         _viewModel.SendToExecutionTargetsCommand.Execute(null);
 
@@ -233,12 +235,12 @@ public sealed class AdExplorerViewModelTests : IDisposable
     [Fact]
     public void SendToExecutionTargets_NoComputers_ShowsInfo()
     {
-        _viewModel.SearchResults.Add(new AdObject
+        _viewModel.SearchResults.Add(new AdObjectRow(new AdObject
         {
             Name = "User1",
             DistinguishedName = "CN=User1,DC=test,DC=local",
             ObjectClass = "user"
-        });
+        }));
 
         _viewModel.SendToExecutionTargetsCommand.Execute(null);
 
@@ -259,7 +261,7 @@ public sealed class AdExplorerViewModelTests : IDisposable
     [Fact]
     public void Constructor_ThrowsOnNullDependencies()
     {
-        Action act = () => _ = new AdExplorerViewModel(null!, _hostTargetingService, _settingsService, _dialogService, _exportService, _logger);
+        Action act = () => _ = new AdExplorerViewModel(null!, _hostTargetingService, _settingsService, _dialogService, _exportService, _dnsResolverService, _logger);
 
         act.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("adService");
     }
@@ -450,13 +452,13 @@ public sealed class AdExplorerViewModelTests : IDisposable
     [Fact]
     public async Task ConfirmExport_CallsExportService()
     {
-        _viewModel.SearchResults.Add(new AdObject
+        _viewModel.SearchResults.Add(new AdObjectRow(new AdObject
         {
             Name = "Obj1",
             DistinguishedName = "CN=Obj1,DC=test,DC=local",
             ObjectClass = "user",
             DisplayName = "Object 1"
-        });
+        }));
 
         _dialogService.ShowSaveFileDialogAsync(".csv", Arg.Any<string>()).Returns("test.csv");
 
@@ -473,13 +475,13 @@ public sealed class AdExplorerViewModelTests : IDisposable
     [Fact]
     public void CopyToClipboard_SetsClipboardText()
     {
-        _viewModel.SearchResults.Add(new AdObject
+        _viewModel.SearchResults.Add(new AdObjectRow(new AdObject
         {
             Name = "PC1",
             DistinguishedName = "CN=PC1,DC=test,DC=local",
             ObjectClass = "computer",
             Description = "Test Computer"
-        });
+        }));
 
         _viewModel.CopyToClipboardCommand.Execute(null);
 
@@ -500,13 +502,14 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _viewModel.SearchEntireDomain.Should().BeTrue();
 
     [Fact]
-    public void DataGridColumns_InitializedWithFourColumns()
+    public void DataGridColumns_InitializedWithFiveColumns()
     {
-        _viewModel.DataGridColumns.Should().HaveCount(4);
+        _viewModel.DataGridColumns.Should().HaveCount(5);
         _viewModel.DataGridColumns[0].Header.Should().Be("Name");
         _viewModel.DataGridColumns[1].Header.Should().Be("Class");
         _viewModel.DataGridColumns[2].Header.Should().Be("Description");
-        _viewModel.DataGridColumns[3].Header.Should().Be("Distinguished Name");
+        _viewModel.DataGridColumns[3].Header.Should().Be("IP Address");
+        _viewModel.DataGridColumns[4].Header.Should().Be("Distinguished Name");
     }
 
     [Fact]
@@ -516,12 +519,12 @@ public sealed class AdExplorerViewModelTests : IDisposable
     [Fact]
     public async Task GoBack_RestoresPreviousSearchState()
     {
-        _viewModel.SearchResults.Add(new AdObject
+        _viewModel.SearchResults.Add(new AdObjectRow(new AdObject
         {
             Name = "Original",
             DistinguishedName = "CN=Original,DC=test,DC=local",
             ObjectClass = "user"
-        });
+        }));
         _viewModel.ResultStatus = "1 results";
 
         var result = new AdSearchResult
@@ -652,12 +655,12 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _adService.GetObjectAclAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
             .Returns(acl);
 
-        _viewModel.SelectedObject = new AdObject
+        _viewModel.SelectedObject = new AdObjectRow(new AdObject
         {
             Name = "User1",
             DistinguishedName = "CN=User1,DC=test,DC=local",
             ObjectClass = "user"
-        };
+        });
 
         await Task.Delay(200);
 
@@ -680,12 +683,12 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _adService.GetObjectAclAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
             .Returns(acl);
 
-        _viewModel.SelectedObject = new AdObject
+        _viewModel.SelectedObject = new AdObjectRow(new AdObject
         {
             Name = "User1",
             DistinguishedName = "CN=User1,DC=test,DC=local",
             ObjectClass = "user"
-        };
+        });
         await Task.Delay(200);
         _viewModel.SelectedObjectPermissions.Should().NotBeEmpty();
 
@@ -704,12 +707,12 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _adService.GetObjectAclAsync("CN=User1,DC=test,DC=local", Arg.Any<CancellationToken>())
             .Returns([]);
 
-        _viewModel.SelectedObject = new AdObject
+        _viewModel.SelectedObject = new AdObjectRow(new AdObject
         {
             Name = "User1",
             DistinguishedName = "CN=User1,DC=test,DC=local",
             ObjectClass = "user"
-        };
+        });
 
         await Task.Delay(200);
 

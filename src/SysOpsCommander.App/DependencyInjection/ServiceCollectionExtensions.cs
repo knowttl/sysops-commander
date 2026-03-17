@@ -42,6 +42,8 @@ public static class ServiceCollectionExtensions
         _ = services.AddSingleton<IScriptLoaderService, ScriptLoaderService>();
         _ = services.AddSingleton<IExportService, ExportService>();
 
+        _ = services.AddTransient<IDnsResolverService, DnsResolverService>();
+
         _ = services.AddSingleton<IAutoUpdateService, AutoUpdateService>();
 
         _ = services.AddSingleton<IDialogService, DialogService>();
