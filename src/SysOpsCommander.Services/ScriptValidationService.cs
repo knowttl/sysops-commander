@@ -163,6 +163,89 @@ public sealed class ScriptValidationService : IScriptValidationService
     }
 
     /// <inheritdoc/>
+    public Task<ScriptFullValidationResult> ValidateScriptFullAsync(
+        string scriptPath,
+        ScriptManifest? manifest,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(scriptPath);
+        _logger.Debug("Running full validation on: {ScriptPath}", scriptPath);
+
+        if (!File.Exists(scriptPath))
+        {
+            return Task.FromResult(new ScriptFullValidationResult
+            {
+                SyntaxResult = new ScriptSyntaxResult
+                {
+                    Errors = [new ScriptValidationError { Line = 0, Column = 0, Message = $"Script file not found: {scriptPath}" }]
+                }
+            });
+        }
+
+        ScriptBlockAst ast;
+        ParseError[] parseErrors;
+        try
+        {
+            ast = Parser.ParseFile(scriptPath, out _, out parseErrors);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Task.FromResult(new ScriptFullValidationResult
+            {
+                SyntaxResult = new ScriptSyntaxResult
+                {
+                    Errors = [new ScriptValidationError { Line = 0, Column = 0, Message = $"Permission denied reading script: {ex.Message}" }]
+                }
+            });
+        }
+
+        var syntaxErrors = parseErrors.Select(static e => new ScriptValidationError
+        {
+            Line = e.Extent.StartLineNumber,
+            Column = e.Extent.StartColumnNumber,
+            Message = e.Message
+        }).ToList();
+
+        List<DangerousPatternWarning> dangerousPatterns = AnalyzeAst(ast);
+
+        if (dangerousPatterns.Count > 0)
+        {
+            _logger.Warning("Detected {Count} dangerous pattern(s) in {ScriptPath}", dangerousPatterns.Count, scriptPath);
+        }
+
+        ManifestValidationResult manifestResult = new();
+
+        if (manifest is not null)
+        {
+            ManifestValidationResult schemaResult = ManifestSchemaValidator.Validate(manifest);
+            List<string> errors = [.. schemaResult.Errors];
+            List<string> warnings = [.. schemaResult.Warnings];
+
+            if (manifest.Parameters.Count > 0)
+            {
+                HashSet<string> scriptParamNames = GetScriptParameterNames(ast);
+                foreach (ScriptParameter manifestParam in manifest.Parameters)
+                {
+                    if (!string.IsNullOrWhiteSpace(manifestParam.Name) &&
+                        !scriptParamNames.Contains(manifestParam.Name))
+                    {
+                        warnings.Add($"Manifest parameter '{manifestParam.Name}' not found in script param() block.");
+                    }
+                }
+            }
+
+            manifestResult = new ManifestValidationResult { Errors = errors, Warnings = warnings };
+        }
+
+        return Task.FromResult(new ScriptFullValidationResult
+        {
+            SyntaxResult = new ScriptSyntaxResult { Errors = syntaxErrors },
+            DangerousPatterns = dangerousPatterns,
+            ManifestResult = manifestResult
+        });
+    }
+
+    /// <inheritdoc/>
     public async Task<ValidationResult> ValidateCredSspAvailabilityAsync(string hostname, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(hostname);

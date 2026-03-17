@@ -99,7 +99,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
             Parameters = []
         };
         CreateManifestFor(scriptPath, manifest);
-        SetupValidationMocks(scriptPath, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(scriptPath);
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
 
@@ -115,7 +115,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
     public async Task LoadScriptAsync_WithoutManifest_LoadsAsDropIn()
     {
         string scriptPath = CreateTempScript("Get-Process");
-        SetupValidationMocks(scriptPath, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(scriptPath);
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
 
@@ -130,16 +130,14 @@ public sealed class ScriptLoaderServiceTests : IDisposable
     {
         string scriptPath = CreateTempScript("function { broken syntax");
 
-        _validationService.ValidateSyntaxAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns(new ScriptSyntaxResult
+        _validationService.ValidateScriptFullAsync(scriptPath, Arg.Any<ScriptManifest?>(), Arg.Any<CancellationToken>())
+            .Returns(new ScriptFullValidationResult
             {
-                Errors =
-                [
-                    new ScriptValidationError { Line = 1, Column = 10, Message = "Unexpected token" }
-                ]
+                SyntaxResult = new ScriptSyntaxResult
+                {
+                    Errors = [new ScriptValidationError { Line = 1, Column = 10, Message = "Unexpected token" }]
+                }
             });
-        _validationService.DetectDangerousPatternsAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyList<DangerousPatternWarning>)[]);
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
 
@@ -152,19 +150,21 @@ public sealed class ScriptLoaderServiceTests : IDisposable
     public async Task LoadScriptAsync_DangerousPattern_SetsEffectiveDangerLevel()
     {
         string scriptPath = CreateTempScript("Remove-Item -Recurse -Force C:\\");
-        SetupValidationMocks(scriptPath, syntaxValid: true, manifestValid: true);
 
-        _validationService.DetectDangerousPatternsAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyList<DangerousPatternWarning>)
-            [
-                new DangerousPatternWarning
-                {
-                    PatternName = "Remove-Item",
-                    Description = "Deletes files or directories",
-                    LineNumber = 1,
-                    DangerLevel = ScriptDangerLevel.Destructive
-                }
-            ]);
+        _validationService.ValidateScriptFullAsync(scriptPath, Arg.Any<ScriptManifest?>(), Arg.Any<CancellationToken>())
+            .Returns(new ScriptFullValidationResult
+            {
+                DangerousPatterns =
+                [
+                    new DangerousPatternWarning
+                    {
+                        PatternName = "Remove-Item",
+                        Description = "Deletes files or directories",
+                        LineNumber = 1,
+                        DangerLevel = ScriptDangerLevel.Destructive
+                    }
+                ]
+            });
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
 
@@ -188,7 +188,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
             Parameters = []
         };
         CreateManifestFor(scriptPath, manifest);
-        SetupValidationMocks(scriptPath, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(scriptPath);
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
 
@@ -201,7 +201,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
         string scriptPath = CreateTempScript("Write-Output 'test'");
         string jsonPath = Path.ChangeExtension(scriptPath, ".json");
         await File.WriteAllTextAsync(jsonPath, "{ not valid json }}}");
-        SetupValidationMocks(scriptPath, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(scriptPath);
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
 
@@ -224,8 +224,8 @@ public sealed class ScriptLoaderServiceTests : IDisposable
                 new ScriptFileInfo(script2, null, DateTime.UtcNow)
             ]);
 
-        SetupValidationMocks(script1, syntaxValid: true, manifestValid: true);
-        SetupValidationMocks(script2, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(script1);
+        SetupFullValidationMock(script2);
 
         IReadOnlyList<ScriptPlugin> results = await _service.LoadAllScriptsAsync(CancellationToken.None);
 
@@ -245,7 +245,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
                 new ScriptFileInfo(goodScript, null, DateTime.UtcNow)
             ]);
 
-        SetupValidationMocks(goodScript, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(goodScript);
 
         IReadOnlyList<ScriptPlugin> results = await _service.LoadAllScriptsAsync(CancellationToken.None);
 
@@ -257,7 +257,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
     public async Task RefreshAsync_DetectsAddedAndRemovedScripts()
     {
         string script1 = CreateTempScript("Write-Output 'original'");
-        SetupValidationMocks(script1, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(script1);
 
         _fileProvider.ScanForScriptsAsync(Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<ScriptFileInfo>)
@@ -268,7 +268,7 @@ public sealed class ScriptLoaderServiceTests : IDisposable
         await _service.LoadAllScriptsAsync(CancellationToken.None);
 
         string script2 = CreateTempScript("Write-Output 'added'");
-        SetupValidationMocks(script2, syntaxValid: true, manifestValid: true);
+        SetupFullValidationMock(script2);
 
         _fileProvider.ScanForScriptsAsync(Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<ScriptFileInfo>)
@@ -303,15 +303,14 @@ public sealed class ScriptLoaderServiceTests : IDisposable
         };
         CreateManifestFor(scriptPath, manifest);
 
-        _validationService.ValidateSyntaxAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns(new ScriptSyntaxResult());
-        _validationService.DetectDangerousPatternsAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyList<DangerousPatternWarning>)[]);
-        _validationService.ValidateManifestPairAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns(new ManifestValidationResult
+        _validationService.ValidateScriptFullAsync(scriptPath, Arg.Any<ScriptManifest?>(), Arg.Any<CancellationToken>())
+            .Returns(new ScriptFullValidationResult
             {
-                Errors = ["Parameter 'Foo' in manifest not found in script"],
-                Warnings = ["Missing description for parameter 'Bar'"]
+                ManifestResult = new ManifestValidationResult
+                {
+                    Errors = ["Parameter 'Foo' in manifest not found in script"],
+                    Warnings = ["Missing description for parameter 'Bar'"]
+                }
             });
 
         ScriptPlugin result = await _service.LoadScriptAsync(scriptPath, CancellationToken.None);
@@ -319,6 +318,63 @@ public sealed class ScriptLoaderServiceTests : IDisposable
         result.IsValidated.Should().BeFalse();
         result.ValidationErrors.Should().Contain(e => e.Contains("Parameter 'Foo'"));
         result.ValidationWarnings.Should().Contain(w => w.Contains("Missing description"));
+    }
+
+    [Fact]
+    public async Task LoadAllScriptsAsync_CachedUnchangedScript_ServesFromCache()
+    {
+        string scriptPath = CreateTempScript("Write-Output 'cached'");
+        DateTime fileTime = File.GetLastWriteTimeUtc(scriptPath);
+        SetupFullValidationMock(scriptPath);
+
+        _fileProvider.ScanForScriptsAsync(Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ScriptFileInfo>)
+            [
+                new ScriptFileInfo(scriptPath, null, fileTime)
+            ]);
+
+        IReadOnlyList<ScriptPlugin> first = await _service.LoadAllScriptsAsync(CancellationToken.None);
+        first.Should().HaveCount(1);
+
+        // Second call with same timestamp should use cache
+        IReadOnlyList<ScriptPlugin> second = await _service.LoadAllScriptsAsync(CancellationToken.None);
+        second.Should().HaveCount(1);
+        second[0].FilePath.Should().Be(scriptPath);
+
+        // ValidateScriptFullAsync should have been called only once (first load)
+        await _validationService.Received(1)
+            .ValidateScriptFullAsync(scriptPath, Arg.Any<ScriptManifest?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LoadAllScriptsAsync_ModifiedScript_ReloadsFromDisk()
+    {
+        string scriptPath = CreateTempScript("Write-Output 'v1'");
+        DateTime originalTime = File.GetLastWriteTimeUtc(scriptPath);
+        SetupFullValidationMock(scriptPath);
+
+        _fileProvider.ScanForScriptsAsync(Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ScriptFileInfo>)
+            [
+                new ScriptFileInfo(scriptPath, null, originalTime)
+            ]);
+
+        await _service.LoadAllScriptsAsync(CancellationToken.None);
+
+        // Simulate file modification with a newer timestamp
+        DateTime newerTime = originalTime.AddSeconds(1);
+
+        _fileProvider.ScanForScriptsAsync(Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ScriptFileInfo>)
+            [
+                new ScriptFileInfo(scriptPath, null, newerTime)
+            ]);
+
+        await _service.LoadAllScriptsAsync(CancellationToken.None);
+
+        // ValidateScriptFullAsync should have been called twice (original + reload)
+        await _validationService.Received(2)
+            .ValidateScriptFullAsync(scriptPath, Arg.Any<ScriptManifest?>(), Arg.Any<CancellationToken>());
     }
 
     private string CreateTempScript(string content)
@@ -336,22 +392,9 @@ public sealed class ScriptLoaderServiceTests : IDisposable
         File.WriteAllText(jsonPath, json);
     }
 
-    private void SetupValidationMocks(string scriptPath, bool syntaxValid, bool manifestValid)
+    private void SetupFullValidationMock(string scriptPath)
     {
-        _validationService.ValidateSyntaxAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns(syntaxValid
-                ? new ScriptSyntaxResult()
-                : new ScriptSyntaxResult
-                {
-                    Errors = [new ScriptValidationError { Line = 1, Column = 1, Message = "Syntax error" }]
-                });
-
-        _validationService.DetectDangerousPatternsAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyList<DangerousPatternWarning>)[]);
-
-        _validationService.ValidateManifestPairAsync(scriptPath, Arg.Any<CancellationToken>())
-            .Returns(manifestValid
-                ? new ManifestValidationResult()
-                : new ManifestValidationResult { Errors = ["Manifest validation failed"] });
+        _validationService.ValidateScriptFullAsync(scriptPath, Arg.Any<ScriptManifest?>(), Arg.Any<CancellationToken>())
+            .Returns(new ScriptFullValidationResult());
     }
 }

@@ -64,7 +64,7 @@ public partial class DashboardViewModel : ObservableObject, IRefreshable, IDispo
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task RefreshAsync()
     {
-        LoadActiveDomain();
+        await LoadActiveDomainAsync();
         await LoadRecentExecutionsAsync();
     }
 
@@ -123,11 +123,11 @@ public partial class DashboardViewModel : ObservableObject, IRefreshable, IDispo
         }
     }
 
-    private void LoadActiveDomain()
+    private async Task LoadActiveDomainAsync()
     {
         try
         {
-            DomainConnection domain = _adService.GetActiveDomain();
+            DomainConnection domain = await Task.Run(_adService.GetActiveDomain);
             ActiveDomainName = domain.DomainName;
         }
         catch (Exception ex)

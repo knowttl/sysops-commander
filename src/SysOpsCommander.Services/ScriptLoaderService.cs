@@ -47,13 +47,23 @@ public sealed class ScriptLoaderService : IScriptLoaderService
             .ScanForScriptsAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        List<ScriptPlugin> plugins = [];
+        var plugins = new ConcurrentBag<ScriptPlugin>();
 
-        foreach (ScriptFileInfo file in files)
+        await Parallel.ForEachAsync(files, new ParallelOptions
         {
+            MaxDegreeOfParallelism = Environment.ProcessorCount,
+            CancellationToken = cancellationToken
+        }, async (file, token) =>
+        {
+            if (IsCacheValid(file))
+            {
+                plugins.Add(_cache[file.FullPath]);
+                return;
+            }
+
             try
             {
-                ScriptPlugin plugin = await LoadScriptAsync(file.FullPath, cancellationToken)
+                ScriptPlugin plugin = await LoadScriptAsync(file.FullPath, token)
                     .ConfigureAwait(false);
                 plugins.Add(plugin);
             }
@@ -61,10 +71,10 @@ public sealed class ScriptLoaderService : IScriptLoaderService
             {
                 _logger.Error(ex, "Failed to load script: {ScriptPath}", file.FullPath);
             }
-        }
+        }).ConfigureAwait(false);
 
         _logger.Information("Loaded {Count} script plugin(s)", plugins.Count);
-        return plugins;
+        return [.. plugins];
     }
 
     /// <inheritdoc/>
@@ -89,37 +99,37 @@ public sealed class ScriptLoaderService : IScriptLoaderService
 
         if (File.Exists(jsonPath))
         {
-            (manifest, List<string> errors, List<string> warnings) = await LoadManifestAsync(filePath, jsonPath, cancellationToken)
-                .ConfigureAwait(false);
+            (manifest, List<string> errors, List<string> warnings) =
+                await ReadManifestAsync(jsonPath, cancellationToken).ConfigureAwait(false);
             validationErrors.AddRange(errors);
             validationWarnings.AddRange(warnings);
         }
 
-        ScriptSyntaxResult syntaxResult = await _validationService
-            .ValidateSyntaxAsync(filePath, cancellationToken)
+        // Single-pass validation: parse AST once for syntax, dangerous patterns, and manifest parameter alignment
+        ScriptFullValidationResult validation = await _validationService
+            .ValidateScriptFullAsync(filePath, manifest, cancellationToken)
             .ConfigureAwait(false);
 
-        if (!syntaxResult.IsValid)
+        if (!validation.SyntaxResult.IsValid)
         {
-            validationErrors.AddRange(syntaxResult.Errors.Select(static e =>
+            validationErrors.AddRange(validation.SyntaxResult.Errors.Select(static e =>
                 $"Line {e.Line}, Col {e.Column}: {e.Message}"));
         }
 
-        IReadOnlyList<DangerousPatternWarning> dangerousPatterns = await _validationService
-            .DetectDangerousPatternsAsync(filePath, cancellationToken)
-            .ConfigureAwait(false);
+        validationErrors.AddRange(validation.ManifestResult.Errors);
+        validationWarnings.AddRange(validation.ManifestResult.Warnings);
 
-        ScriptDangerLevel effectiveLevel = ComputeEffectiveDangerLevel(manifest, dangerousPatterns);
+        ScriptDangerLevel effectiveLevel = ComputeEffectiveDangerLevel(manifest, validation.DangerousPatterns);
 
         var plugin = new ScriptPlugin
         {
             FilePath = filePath,
             FileName = Path.GetFileName(filePath),
             Manifest = manifest,
-            IsValidated = syntaxResult.IsValid && validationErrors.Count == 0,
+            IsValidated = validation.SyntaxResult.IsValid && validationErrors.Count == 0,
             ValidationErrors = validationErrors,
             ValidationWarnings = validationWarnings,
-            DangerousPatterns = dangerousPatterns,
+            DangerousPatterns = validation.DangerousPatterns,
             EffectiveDangerLevel = effectiveLevel,
             Content = scriptContent,
             LastModified = File.GetLastWriteTimeUtc(filePath)
@@ -165,8 +175,24 @@ public sealed class ScriptLoaderService : IScriptLoaderService
             added.Count, removed.Count);
     }
 
-    private async Task<(ScriptManifest? Manifest, List<string> Errors, List<string> Warnings)> LoadManifestAsync(
-        string ps1Path,
+    private bool IsCacheValid(ScriptFileInfo file)
+    {
+        if (!_cache.TryGetValue(file.FullPath, out ScriptPlugin? cached))
+        {
+            return false;
+        }
+
+        if (cached.LastModified < file.LastModified)
+        {
+            return false;
+        }
+
+        // Also invalidate if the manifest file has been modified since the script was cached
+        return file.ManifestPath is null || !File.Exists(file.ManifestPath) ||
+               File.GetLastWriteTimeUtc(file.ManifestPath) <= cached.LastModified;
+    }
+
+    private static async Task<(ScriptManifest? Manifest, List<string> Errors, List<string> Warnings)> ReadManifestAsync(
         string jsonPath,
         CancellationToken cancellationToken)
     {
@@ -176,21 +202,12 @@ public sealed class ScriptLoaderService : IScriptLoaderService
                 .ConfigureAwait(false);
 
             ScriptManifest? manifest = JsonSerializer.Deserialize<ScriptManifest>(json);
-
-            if (manifest is null)
-            {
-                return (null, ["Manifest deserialized to null."], []);
-            }
-
-            ManifestValidationResult pairResult = await _validationService
-                .ValidateManifestPairAsync(ps1Path, cancellationToken)
-                .ConfigureAwait(false);
-
-            return (manifest, [.. pairResult.Errors], [.. pairResult.Warnings]);
+            return manifest is null
+                ? (null, ["Manifest deserialized to null."], [])
+                : (manifest, [], []);
         }
         catch (JsonException ex)
         {
-            _logger.Warning(ex, "Failed to parse manifest for {ScriptPath}", ps1Path);
             return (null, [$"Failed to parse manifest JSON: {ex.Message}"], []);
         }
     }

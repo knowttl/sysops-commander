@@ -107,6 +107,8 @@ public sealed class HostTargetingService : IHostTargetingService
             "Starting reachability check for {Count} pending targets on port {Port}",
             pendingTargets.Count, port);
 
+        var statusUpdates = new System.Collections.Concurrent.ConcurrentBag<(HostTarget Target, HostStatus Status)>();
+
         await Parallel.ForEachAsync(
             pendingTargets,
             new ParallelOptions
@@ -121,9 +123,10 @@ public sealed class HostTargetingService : IHostTargetingService
                     using TcpClient client = new();
                     Task connectTask = client.ConnectAsync(target.Hostname, port, ct).AsTask();
                     Task completedTask = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(5), ct)).ConfigureAwait(false);
-                    target.Status = completedTask == connectTask && connectTask.IsCompletedSuccessfully
+                    HostStatus status = completedTask == connectTask && connectTask.IsCompletedSuccessfully
                         ? HostStatus.Reachable
                         : HostStatus.Unreachable;
+                    statusUpdates.Add((target, status));
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
@@ -131,9 +134,15 @@ public sealed class HostTargetingService : IHostTargetingService
                 }
                 catch
                 {
-                    target.Status = HostStatus.Unreachable;
+                    statusUpdates.Add((target, HostStatus.Unreachable));
                 }
             }).ConfigureAwait(false);
+
+        // Apply status updates on the caller's thread to avoid cross-thread ObservableObject issues
+        foreach ((HostTarget target, HostStatus status) in statusUpdates)
+        {
+            target.Status = status;
+        }
 
         int reachable = pendingTargets.Count(t => t.Status == HostStatus.Reachable);
         _logger.Information(

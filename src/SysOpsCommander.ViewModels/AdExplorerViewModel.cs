@@ -25,6 +25,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private readonly IExportService _exportService;
     private readonly ILogger _logger;
     private CancellationTokenSource? _searchDebounceTimer;
+    private CancellationTokenSource? _treeFilterDebounceTimer;
+    private CancellationTokenSource? _searchCts;
     private readonly CancellationTokenSource _cts = new();
     private bool _isRefreshing;
 
@@ -270,7 +272,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _isRefreshing = true;
         try
         {
-            DomainConnection domain = _adService.GetActiveDomain();
+            DomainConnection domain = await Task.Run(_adService.GetActiveDomain);
             ActiveDomainDisplay = domain.DomainName;
 
             IReadOnlyList<AdObject> rootChildren = await _adService.BrowseChildrenAsync(
@@ -358,6 +360,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             return;
         }
 
+        // Cancel any previous in-flight search
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        CancellationToken searchToken = _searchCts.Token;
+
         PushSearchState();
         IsSearching = true;
         ResultStatus = "Searching...";
@@ -369,12 +377,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             if (IsLdapFilterMode)
             {
                 string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
-                result = await _adService.SearchWithFilterAsync(RawLdapFilter, baseDn, _cts.Token);
+                result = await _adService.SearchWithFilterAsync(RawLdapFilter, baseDn, searchToken);
             }
             else if (FilterOus)
             {
                 string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
-                result = await _adService.SearchOusAsync(SearchText, baseDn, _cts.Token);
+                result = await _adService.SearchOusAsync(SearchText, baseDn, searchToken);
             }
             else
             {
@@ -383,8 +391,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                 string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
 
                 result = await _adService.SearchScopedAsync(
-                    SearchText, baseDn, objectClasses, attribute, _cts.Token);
+                    SearchText, baseDn, objectClasses, attribute, searchToken);
             }
+
+            // Only apply results if this search wasn't cancelled while awaiting
+            searchToken.ThrowIfCancellationRequested();
 
             SearchResults = new ObservableCollection<AdObject>(result.Results);
             ResultStatus = $"{result.TotalResultCount} results found in {result.ExecutionTime.TotalMilliseconds:F0}ms";
@@ -625,7 +636,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// </summary>
     /// <param name="objectClass">The object class filter to toggle (Users, Computers, Groups, OUs, All).</param>
     [RelayCommand]
-    private void ToggleFilter(string? objectClass)
+    private async Task ToggleFilterAsync(string? objectClass)
     {
         if (objectClass == "All")
         {
@@ -634,7 +645,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             FilterComputers = false;
             FilterGroups = false;
             FilterOus = false;
-            SearchCommand.Execute(null);
+            await SearchAsync();
             return;
         }
 
@@ -673,7 +684,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             FilterAll = true;
         }
 
-        SearchCommand.Execute(null);
+        await SearchAsync();
     }
 
     /// <summary>
@@ -683,7 +694,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private void ResetScope()
     {
         ScopeDisplay = string.Empty;
-        SearchEntireDomain = false;
+        SearchEntireDomain = true;
         BreadcrumbSegments.Clear();
     }
 
@@ -757,6 +768,12 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     partial void OnSearchTextChanged(string value)
     {
         _searchDebounceTimer?.Cancel();
+        _searchDebounceTimer?.Dispose();
+
+        // Cancel any in-flight search so results from a stale query don't overwrite
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
 
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -772,7 +789,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         try
         {
             await Task.Delay(300, token);
-            SearchCommand.Execute(null);
+            await SearchAsync();
         }
         catch (OperationCanceledException)
         {
@@ -882,7 +899,33 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private static bool IsNavigableTreeObject(AdObject obj) =>
         NavigableObjectClasses.Contains(obj.ObjectClass);
 
-    partial void OnTreeFilterTextChanged(string value) => ApplyTreeFilter();
+    partial void OnTreeFilterTextChanged(string value)
+    {
+        _treeFilterDebounceTimer?.Cancel();
+        _treeFilterDebounceTimer?.Dispose();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            ApplyTreeFilter();
+            return;
+        }
+
+        _treeFilterDebounceTimer = new CancellationTokenSource();
+        DebounceTreeFilterAsync(_treeFilterDebounceTimer.Token).SafeFireAndForget(_logger);
+    }
+
+    private async Task DebounceTreeFilterAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(200, token);
+            ApplyTreeFilter();
+        }
+        catch (OperationCanceledException)
+        {
+            // Debounce cancelled — expected when user types quickly
+        }
+    }
 
     private void ApplyTreeFilter()
     {
@@ -1510,6 +1553,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     {
         _searchDebounceTimer?.Cancel();
         _searchDebounceTimer?.Dispose();
+        _treeFilterDebounceTimer?.Cancel();
+        _treeFilterDebounceTimer?.Dispose();
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
         _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
