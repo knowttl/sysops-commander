@@ -30,8 +30,26 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     private CancellationTokenSource? _treeFilterDebounceTimer;
     private CancellationTokenSource? _searchCts;
     private CancellationTokenSource? _dnsResolutionCts;
+    private CancellationTokenSource? _ipCacheCts;
     private readonly CancellationTokenSource _cts = new();
     private bool _isRefreshing;
+
+    /// <summary>
+    /// Cache of all computer objects fetched from AD for IP-based searching.
+    /// </summary>
+    private List<AdObject> _cachedComputers = [];
+
+    /// <summary>
+    /// Cache mapping resolved IP addresses to their dNSHostName values.
+    /// </summary>
+    private readonly Dictionary<string, List<string>> _ipToHostnameIndex = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Cache mapping dNSHostName to resolved IP addresses.
+    /// </summary>
+    private readonly Dictionary<string, IpResolutionResult> _hostnameToIpCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private volatile bool _isIpCacheReady;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -216,7 +234,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         "mail",
         "SID",
         "description",
-        "distinguishedName"
+        "distinguishedName",
+        "IP Address"
     ];
 
     /// <summary>
@@ -262,7 +281,11 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
     /// Refreshes the tree root and active domain display.
     /// </summary>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public Task RefreshAsync() => LoadTreeRootAsync();
+    public Task RefreshAsync()
+    {
+        PopulateIpCacheAsync().SafeFireAndForget(_logger);
+        return LoadTreeRootAsync();
+    }
 
     /// <summary>
     /// Loads the tree root from the active domain.
@@ -391,6 +414,10 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                 string? baseDn = SearchEntireDomain ? null : (string.IsNullOrEmpty(ScopeDisplay) ? null : ScopeDisplay);
                 result = await _adService.SearchOusAsync(SearchText, baseDn, searchToken);
             }
+            else if (SelectedAttribute == "IP Address")
+            {
+                result = await SearchByIpAddressAsync(SearchText, searchToken);
+            }
             else
             {
                 string? attribute = SelectedAttribute == "All attributes" ? null : SelectedAttribute;
@@ -399,6 +426,32 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
 
                 result = await _adService.SearchScopedAsync(
                     SearchText, baseDn, objectClasses, attribute, searchToken);
+
+                // For "All attributes", also merge computers found by IP from the cache
+                if (attribute is null && _isIpCacheReady)
+                {
+                    List<AdObject> ipMatches = FindComputersByIp(SearchText);
+                    if (ipMatches.Count > 0)
+                    {
+                        var existingDns = new HashSet<string>(result.Results.Select(r => r.DistinguishedName), StringComparer.OrdinalIgnoreCase);
+                        var newMatches = ipMatches
+                            .Where(c => !existingDns.Contains(c.DistinguishedName))
+                            .ToList();
+
+                        if (newMatches.Count > 0)
+                        {
+                            List<AdObject> merged = [.. result.Results, .. newMatches];
+                            result = new AdSearchResult
+                            {
+                                Results = merged,
+                                Query = result.Query,
+                                ExecutionTime = result.ExecutionTime,
+                                TotalResultCount = merged.Count,
+                                HasMoreResults = result.HasMoreResults
+                            };
+                        }
+                    }
+                }
             }
 
             // Only apply results if this search wasn't cancelled while awaiting
@@ -831,7 +884,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                 SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
                     detailTask.Result.Attributes
                         .OrderBy(a => a.Key)
-                        .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
+                        .Select(a => new KeyValuePair<string, string>(a.Key, FormatAttributeDisplayValue(a.Value))));
 
                 SelectedObjectGroups = [];
                 SelectedObjectMembers = new ObservableCollection<AdObject>(
@@ -846,7 +899,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                 SelectedObjectAttributes = new ObservableCollection<KeyValuePair<string, string>>(
                     detailTask.Result.Attributes
                         .OrderBy(a => a.Key)
-                        .Select(a => new KeyValuePair<string, string>(a.Key, a.Value?.ToString() ?? string.Empty)));
+                        .Select(a => new KeyValuePair<string, string>(a.Key, FormatAttributeDisplayValue(a.Value))));
 
                 SelectedObjectGroups = new ObservableCollection<string>(
                     groupsTask.Result.Distinct(StringComparer.OrdinalIgnoreCase));
@@ -1576,6 +1629,140 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         }
     }
 
+    private static string FormatAttributeDisplayValue(object? value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            string s => s,
+            byte[] bytes => Convert.ToHexString(bytes),
+            IReadOnlyList<string> list => string.Join(", ", list),
+            IEnumerable<string> strings => string.Join(", ", strings),
+            object[] array => string.Join("; ", array.Select(o => o?.ToString() ?? string.Empty)),
+            _ => value.ToString() ?? string.Empty
+        };
+    }
+
+    private async Task<AdSearchResult> SearchByIpAddressAsync(string ipSearchTerm, CancellationToken cancellationToken)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Wait for cache if not ready, but respect cancellation
+        if (!_isIpCacheReady)
+        {
+            await PopulateIpCacheAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        List<AdObject> matched = FindComputersByIp(ipSearchTerm);
+
+        stopwatch.Stop();
+        return new AdSearchResult
+        {
+            Results = matched,
+            Query = ipSearchTerm,
+            ExecutionTime = stopwatch.Elapsed,
+            TotalResultCount = matched.Count,
+            HasMoreResults = false
+        };
+    }
+
+    private List<AdObject> FindComputersByIp(string searchTerm)
+    {
+        var matchedDns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (KeyValuePair<string, List<string>> entry in _ipToHostnameIndex)
+        {
+            if (entry.Key.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (string hostname in entry.Value)
+                {
+                    _ = matchedDns.Add(hostname);
+                }
+            }
+        }
+
+        return _cachedComputers
+            .Where(c =>
+            {
+                string? hostname = c.Attributes.TryGetValue("dNSHostName", out object? v) ? v?.ToString() : null;
+                return hostname is not null && matchedDns.Contains(hostname);
+            })
+            .ToList();
+    }
+
+    private async Task PopulateIpCacheAsync()
+    {
+        if (_isIpCacheReady)
+        {
+            return;
+        }
+
+        _ipCacheCts?.Cancel();
+        _ipCacheCts?.Dispose();
+        _ipCacheCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        CancellationToken cacheToken = _ipCacheCts.Token;
+
+        try
+        {
+            // Fetch all computer objects from AD
+            AdSearchResult allComputers = await _adService.SearchWithFilterAsync(
+                "(objectClass=computer)", cacheToken);
+
+            cacheToken.ThrowIfCancellationRequested();
+
+            _cachedComputers = [.. allComputers.Results];
+
+            // Extract hostnames for DNS resolution
+            var hostnamesWithCallbacks = _cachedComputers
+                .Select(c => c.Attributes.TryGetValue("dNSHostName", out object? v) ? v?.ToString() : null)
+                .Where(h => !string.IsNullOrWhiteSpace(h))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(h => (h!, (Action<IpResolutionResult>)(result =>
+                {
+                    lock (_hostnameToIpCache)
+                    {
+                        _hostnameToIpCache[h!] = result;
+
+                        if (result.Status == IpResolutionStatus.Resolved)
+                        {
+                            foreach (string ip in result.AllAddresses)
+                            {
+                                if (!_ipToHostnameIndex.TryGetValue(ip, out List<string>? hostnames))
+                                {
+                                    hostnames = [];
+                                    _ipToHostnameIndex[ip] = hostnames;
+                                }
+
+                                if (!hostnames.Contains(h!, StringComparer.OrdinalIgnoreCase))
+                                {
+                                    hostnames.Add(h!);
+                                }
+                            }
+                        }
+                    }
+                })))
+                .ToList();
+
+            if (hostnamesWithCallbacks.Count > 0)
+            {
+                await _dnsResolverService.ResolveAllAsync(hostnamesWithCallbacks, cacheToken);
+            }
+
+            _isIpCacheReady = true;
+            _logger.Information("IP cache populated: {ComputerCount} computers, {IpCount} IPs resolved",
+                _cachedComputers.Count, _ipToHostnameIndex.Count);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.Debug("IP cache population cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to populate IP address cache");
+        }
+    }
+
     private void ResolveIpAddressesForResults()
     {
         _dnsResolutionCts?.Cancel();
@@ -1633,6 +1820,8 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
         _searchCts?.Dispose();
         _dnsResolutionCts?.Cancel();
         _dnsResolutionCts?.Dispose();
+        _ipCacheCts?.Cancel();
+        _ipCacheCts?.Dispose();
         _cts.Cancel();
         _cts.Dispose();
         GC.SuppressFinalize(this);
@@ -1727,6 +1916,7 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
             new DataGridColumnConfig { Header = "Class", PropertyName = "ObjectClass" },
             new DataGridColumnConfig { Header = "Description", PropertyName = "Description" },
             new DataGridColumnConfig { Header = "IP Address", PropertyName = "IpAddress" },
+            new DataGridColumnConfig { Header = "Disabled", PropertyName = "IsDisabled" },
             new DataGridColumnConfig { Header = "Distinguished Name", PropertyName = "DistinguishedName" }
         ];
     }

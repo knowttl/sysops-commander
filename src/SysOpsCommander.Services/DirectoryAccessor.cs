@@ -1,5 +1,6 @@
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -148,11 +149,40 @@ public sealed class DirectoryAccessor : IDirectoryAccessor
         {
             PropertyValueCollection values = entry.Properties[propName];
             attributes[propName] = values.Count == 1
-                ? values[0]
-                : values.Cast<object>().ToArray();
+                ? ConvertComObject(values[0]!)
+                : values.Cast<object>().Select(ConvertComObject).ToArray();
         }
 
         return attributes;
+    }
+
+    /// <summary>
+    /// Converts COM interop objects (IADsLargeInteger) to .NET types.
+    /// Falls through for non-COM values.
+    /// </summary>
+    private static object ConvertComObject(object value)
+    {
+        if (!Marshal.IsComObject(value))
+        {
+            return value;
+        }
+
+        try
+        {
+            // IADsLargeInteger — used for file-time attributes (lastLogon, accountExpires, etc.)
+            int highPart = (int)value.GetType().InvokeMember(
+                "HighPart", System.Reflection.BindingFlags.GetProperty, null, value, null,
+                System.Globalization.CultureInfo.InvariantCulture)!;
+            int lowPart = (int)value.GetType().InvokeMember(
+                "LowPart", System.Reflection.BindingFlags.GetProperty, null, value, null,
+                System.Globalization.CultureInfo.InvariantCulture)!;
+            long fileTime = ((long)highPart << 32) | (uint)lowPart;
+            return fileTime;
+        }
+        catch (Exception)
+        {
+            return value.GetType().Name;
+        }
     }
 
     /// <inheritdoc />
