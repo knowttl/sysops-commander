@@ -502,19 +502,24 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _viewModel.SearchEntireDomain.Should().BeTrue();
 
     [Fact]
-    public void DataGridColumns_InitializedWithFiveColumns()
+    public void DataGridColumns_InitializedWithSixColumns()
     {
-        _viewModel.DataGridColumns.Should().HaveCount(5);
+        _viewModel.DataGridColumns.Should().HaveCount(6);
         _viewModel.DataGridColumns[0].Header.Should().Be("Name");
         _viewModel.DataGridColumns[1].Header.Should().Be("Class");
         _viewModel.DataGridColumns[2].Header.Should().Be("Description");
         _viewModel.DataGridColumns[3].Header.Should().Be("IP Address");
-        _viewModel.DataGridColumns[4].Header.Should().Be("Distinguished Name");
+        _viewModel.DataGridColumns[4].Header.Should().Be("Disabled");
+        _viewModel.DataGridColumns[5].Header.Should().Be("Distinguished Name");
     }
 
     [Fact]
     public void DataGridColumns_AllVisibleByDefault() =>
         _viewModel.DataGridColumns.Should().OnlyContain(c => c.IsVisible);
+
+    [Fact]
+    public void AttributeOptions_ContainsIpAddress() =>
+        _viewModel.AttributeOptions.Should().Contain("IP Address");
 
     [Fact]
     public async Task GoBack_RestoresPreviousSearchState()

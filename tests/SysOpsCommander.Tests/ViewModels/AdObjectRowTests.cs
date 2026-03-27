@@ -220,4 +220,42 @@ public sealed class AdObjectRowTests
         Action act = () => row.UpdateFromResolutionResult(null!);
         act.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("result");
     }
+
+    [Fact]
+    public void IsDisabled_DisabledAccount_ReturnsTrue()
+    {
+        var adObject = new AdObject
+        {
+            Name = "PC1",
+            DistinguishedName = "CN=PC1,DC=test,DC=local",
+            ObjectClass = "computer",
+            Attributes = new Dictionary<string, object?> { ["userAccountControl"] = 4098 } // 0x1002 = WORKSTATION_TRUST + ACCOUNTDISABLE
+        };
+        var row = new AdObjectRow(adObject);
+
+        row.IsDisabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsDisabled_EnabledAccount_ReturnsFalse()
+    {
+        var adObject = new AdObject
+        {
+            Name = "PC1",
+            DistinguishedName = "CN=PC1,DC=test,DC=local",
+            ObjectClass = "computer",
+            Attributes = new Dictionary<string, object?> { ["userAccountControl"] = 4096 } // 0x1000 = WORKSTATION_TRUST only
+        };
+        var row = new AdObjectRow(adObject);
+
+        row.IsDisabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsDisabled_NoUacAttribute_ReturnsFalse()
+    {
+        var row = new AdObjectRow(CreateUserObject());
+
+        row.IsDisabled.Should().BeFalse();
+    }
 }

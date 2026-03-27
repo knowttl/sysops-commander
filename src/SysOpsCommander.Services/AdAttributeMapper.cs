@@ -12,7 +12,8 @@ internal static class AdAttributeMapper
 {
     private static readonly HashSet<string> FileTimeAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "lastLogonTimestamp", "pwdLastSet", "accountExpires", "lockoutTime", "badPasswordTime"
+        "lastLogonTimestamp", "pwdLastSet", "accountExpires", "lockoutTime", "badPasswordTime",
+        "lastLogon", "lastLogoff"
     };
 
     private static readonly HashSet<string> BinarySidAttributes = new(StringComparer.OrdinalIgnoreCase)

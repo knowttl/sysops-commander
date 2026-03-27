@@ -781,10 +781,13 @@
                                                         Visibility="{Binding DataContext.DataGridColumns[3].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Padding="4,2" VerticalAlignment="Center">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Text" Value="{Binding IpAddress}" />
+                                            <TextBox IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                     Background="Transparent" BorderThickness="0"
+                                                     Padding="4,2" VerticalAlignment="Center"
+                                                     ContextMenu="{x:Null}">
+                                                <TextBox.Style>
+                                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                        <Setter Property="Text" Value="{Binding IpAddress, Mode=OneWay}" />
                                                         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                         <Setter Property="ToolTip">
                                                             <Setter.Value>
@@ -810,13 +813,34 @@
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Disabled" Width="70" SortMemberPath="IsDisabled"
+                                                        Visibility="{Binding DataContext.DataGridColumns[4].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Padding="4,2" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDisabled}" Value="True">
+                                                                <Setter Property="Text" Value="Yes" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource AccentRedBrush}" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="Distinguished Name" Width="2*" SortMemberPath="DistinguishedName"
-                                                        Visibility="{Binding DataContext.DataGridColumns[4].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        Visibility="{Binding DataContext.DataGridColumns[5].IsVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding DistinguishedName, Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
@@ -1213,10 +1237,11 @@
                                 </ItemsControl.Style>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}"
-                                                   Style="{StaticResource MonoStyle}"
-                                                   FontSize="12"
-                                                   Padding="0,1" />
+                                        <TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                                 Background="Transparent" BorderThickness="0"
+                                                 FontFamily="Cascadia Mono, Consolas, Courier New"
+                                                 FontSize="12"
+                                                 Padding="0,1" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

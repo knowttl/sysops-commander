@@ -74,6 +74,30 @@ public partial class AdObjectRow : ObservableObject
     public bool IsComputer => ObjectClass.Equals("computer", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Gets a value indicating whether this account is disabled based on the userAccountControl attribute.
+    /// </summary>
+    public bool IsDisabled
+    {
+        get
+        {
+            if (!AdObject.Attributes.TryGetValue("userAccountControl", out object? uacValue) || uacValue is null)
+            {
+                return false;
+            }
+
+            int uac = uacValue switch
+            {
+                int i => i,
+                long l => (int)l,
+                string s when int.TryParse(s, out int parsed) => parsed,
+                _ => 0
+            };
+
+            return (uac & 0x0002) != 0;
+        }
+    }
+
+    /// <summary>
     /// Gets the DNS hostname from the AD attributes, if available.
     /// </summary>
     public string? DnsHostName =>
