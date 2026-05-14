@@ -775,4 +775,108 @@ public sealed class AdExplorerViewModelTests : IDisposable
         _dialogService.Received(1).SetClipboardText("OU=Finance,DC=test,DC=local");
         _viewModel.ResultStatus.Should().Contain("Copied OU path");
     }
+
+    [Fact]
+    public async Task Search_WithDistinguishedNameAttribute_FiltersByDnClientSide()
+    {
+        var result = new AdSearchResult
+        {
+            Query = "Finance",
+            TotalResultCount = 3,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(30),
+            Results =
+            [
+                new AdObject { Name = "FinanceOU", DistinguishedName = "OU=Finance,DC=test,DC=local", ObjectClass = "organizationalUnit" },
+                new AdObject { Name = "Finance Group", DistinguishedName = "CN=Finance Group,OU=Groups,DC=test,DC=local", ObjectClass = "group" },
+                new AdObject { Name = "Marketing", DistinguishedName = "OU=Marketing,DC=test,DC=local", ObjectClass = "organizationalUnit" }
+            ]
+        };
+        _adService.SearchScopedAsync("Finance", Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(),
+                "distinguishedName", Arg.Any<CancellationToken>())
+            .Returns(result);
+
+        _viewModel.SelectedAttribute = "distinguishedName";
+        _viewModel.SearchText = "Finance";
+        await _viewModel.SearchCommand.ExecuteAsync(null);
+
+        _viewModel.SearchResults.Should().HaveCount(2);
+        _viewModel.SearchResults.Select(r => r.Name).Should().BeEquivalentTo("FinanceOU", "Finance Group");
+        _viewModel.ResultStatus.Should().Contain("2 results found");
+    }
+
+    [Fact]
+    public async Task Search_WithDistinguishedNameAttribute_NoMatchingDns_ReturnsEmpty()
+    {
+        var result = new AdSearchResult
+        {
+            Query = "NonExistent",
+            TotalResultCount = 1,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(10),
+            Results =
+            [
+                new AdObject { Name = "SomeObject", DistinguishedName = "CN=SomeObject,DC=test,DC=local", ObjectClass = "user" }
+            ]
+        };
+        _adService.SearchScopedAsync("NonExistent", Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(),
+                "distinguishedName", Arg.Any<CancellationToken>())
+            .Returns(result);
+
+        _viewModel.SelectedAttribute = "distinguishedName";
+        _viewModel.SearchText = "NonExistent";
+        await _viewModel.SearchCommand.ExecuteAsync(null);
+
+        _viewModel.SearchResults.Should().BeEmpty();
+        _viewModel.ResultStatus.Should().Contain("0 results found");
+    }
+
+    [Fact]
+    public async Task Search_AllAttributes_MergesDnMatchedResults()
+    {
+        var standardResult = new AdSearchResult
+        {
+            Query = "Finance",
+            TotalResultCount = 1,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(20),
+            Results =
+            [
+                new AdObject { Name = "Finance Group", DistinguishedName = "CN=Finance Group,OU=Groups,DC=test,DC=local", ObjectClass = "group" }
+            ]
+        };
+
+        var dnResult = new AdSearchResult
+        {
+            Query = "Finance",
+            TotalResultCount = 2,
+            HasMoreResults = false,
+            ExecutionTime = TimeSpan.FromMilliseconds(30),
+            Results =
+            [
+                new AdObject { Name = "Finance Group", DistinguishedName = "CN=Finance Group,OU=Groups,DC=test,DC=local", ObjectClass = "group" },
+                new AdObject { Name = "JohnSmith", DistinguishedName = "CN=JohnSmith,OU=Finance,DC=test,DC=local", ObjectClass = "user" }
+            ]
+        };
+
+        // Standard search (attribute=null)
+        _adService.SearchScopedAsync(
+                Arg.Is("Finance"), Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(),
+                Arg.Is<string?>(a => a == null), Arg.Any<CancellationToken>())
+            .Returns(standardResult);
+
+        // DN search (attribute="distinguishedName")
+        _adService.SearchScopedAsync(
+                Arg.Is("Finance"), Arg.Any<string?>(), Arg.Any<IReadOnlyList<string>?>(),
+                Arg.Is("distinguishedName"), Arg.Any<CancellationToken>())
+            .Returns(dnResult);
+
+        _viewModel.SelectedAttribute = "All attributes";
+        _viewModel.SearchText = "Finance";
+        await _viewModel.SearchCommand.ExecuteAsync(null);
+
+        _viewModel.SearchResults.Should().HaveCount(2);
+        _viewModel.SearchResults.Select(r => r.Name).Should().Contain("JohnSmith");
+        _viewModel.SearchResults.Select(r => r.Name).Should().Contain("Finance Group");
+    }
 }

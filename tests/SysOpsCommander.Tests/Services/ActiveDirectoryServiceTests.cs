@@ -431,4 +431,142 @@ public sealed class ActiveDirectoryServiceTests : IDisposable
         searchResult.HasMoreResults.Should().BeTrue();
         searchResult.TotalResultCount.Should().Be(AppConstants.MaxResultsPerPage);
     }
+
+    [Fact]
+    public async Task SearchScopedAsync_WithDistinguishedNameAttribute_UsesRdnComponentFilter()
+    {
+        _accessor.Search(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string[]>(),
+            Arg.Any<bool>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<TimeSpan>())
+            .Returns([]);
+
+        await _service.SearchScopedAsync("Finance", null, null, "distinguishedName", CancellationToken.None);
+
+        // Pass 1: RDN component search (cn, ou, name)
+        _accessor.Received().Search(
+            "DC=corp,DC=contoso,DC=com",
+            Arg.Is<string>(f =>
+                f.Contains("cn=*Finance*", StringComparison.Ordinal) &&
+                f.Contains("ou=*Finance*", StringComparison.Ordinal) &&
+                f.Contains("name=*Finance*", StringComparison.Ordinal) &&
+                !f.Contains("distinguishedName=", StringComparison.Ordinal)),
+            Arg.Any<string[]>(),
+            true,
+            AppConstants.MaxResultsPerPage,
+            500,
+            Arg.Any<TimeSpan>());
+
+        // Pass 2: OU/container discovery search
+        _accessor.Received().Search(
+            "DC=corp,DC=contoso,DC=com",
+            Arg.Is<string>(f =>
+                f.Contains("objectClass=organizationalUnit", StringComparison.Ordinal) &&
+                f.Contains("objectClass=container", StringComparison.Ordinal)),
+            Arg.Any<string[]>(),
+            true,
+            AppConstants.MaxResultsPerPage,
+            500,
+            Arg.Any<TimeSpan>());
+    }
+
+    [Fact]
+    public async Task SearchScopedAsync_WithDistinguishedNameAttribute_SearchesWithinMatchingOUs()
+    {
+        var ouResult = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["distinguishedName"] = "OU=Finance,DC=corp,DC=contoso,DC=com",
+            ["cn"] = "Finance",
+            ["objectClass"] = new object[] { "top", "organizationalUnit" },
+            ["name"] = "Finance"
+        };
+
+        var childObject = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["distinguishedName"] = "CN=JohnSmith,OU=Finance,DC=corp,DC=contoso,DC=com",
+            ["cn"] = "JohnSmith",
+            ["objectClass"] = new object[] { "top", "person", "user" },
+            ["name"] = "JohnSmith"
+        };
+
+        // First call (RDN search): return the OU itself
+        // Second call (OU discovery): return the OU
+        // Third call (subtree search within OU): return the child object
+        int callCount = 0;
+        _accessor.Search(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string[]>(),
+            Arg.Any<bool>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<TimeSpan>())
+            .Returns(callInfo =>
+            {
+                callCount++;
+                string filter = callInfo.ArgAt<string>(1);
+
+                // OU discovery filter
+                if (filter.Contains("objectClass=organizationalUnit", StringComparison.Ordinal)
+                    && filter.Contains("objectClass=container", StringComparison.Ordinal))
+                {
+                    return (IReadOnlyList<Dictionary<string, object?>>)[ouResult];
+                }
+
+                // Subtree search within the OU (baseDn is OU=Finance)
+                string baseDnArg = callInfo.ArgAt<string>(0);
+                if (baseDnArg.Equals("OU=Finance,DC=corp,DC=contoso,DC=com", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (IReadOnlyList<Dictionary<string, object?>>)[childObject];
+                }
+
+                // RDN search: return the OU itself
+                return (IReadOnlyList<Dictionary<string, object?>>)[ouResult];
+            });
+
+        AdSearchResult result = await _service.SearchScopedAsync(
+            "Finance", null, null, "distinguishedName", CancellationToken.None);
+
+        // Should contain both the OU and the child object under it
+        result.Results.Should().Contain(r => r.DistinguishedName == "OU=Finance,DC=corp,DC=contoso,DC=com");
+        result.Results.Should().Contain(r => r.DistinguishedName == "CN=JohnSmith,OU=Finance,DC=corp,DC=contoso,DC=com");
+    }
+
+    [Fact]
+    public async Task SearchScopedAsync_AllAttributes_IncludesNameInFilter()
+    {
+        _accessor.Search(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string[]>(),
+            Arg.Any<bool>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<TimeSpan>())
+            .Returns([]);
+
+        await _service.SearchScopedAsync("test", null, null, null, CancellationToken.None);
+
+        _accessor.Received(1).Search(
+            "DC=corp,DC=contoso,DC=com",
+            Arg.Is<string>(f =>
+                f.Contains("name=*test*", StringComparison.Ordinal) &&
+                f.Contains("sAMAccountName=*test*", StringComparison.Ordinal)),
+            Arg.Any<string[]>(),
+            true,
+            AppConstants.MaxResultsPerPage,
+            500,
+            Arg.Any<TimeSpan>());
+    }
+
+    [Fact]
+    public async Task SearchScopedAsync_WithRegularAttribute_UsesAttributeDirectly()
+    {
+        _accessor.Search(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string[]>(),
+            Arg.Any<bool>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<TimeSpan>())
+            .Returns([]);
+
+        await _service.SearchScopedAsync("jdoe", null, null, "sAMAccountName", CancellationToken.None);
+
+        _accessor.Received(1).Search(
+            "DC=corp,DC=contoso,DC=com",
+            Arg.Is<string>(f =>
+                f.Contains("sAMAccountName=*jdoe*", StringComparison.Ordinal) &&
+                !f.Contains("cn=", StringComparison.Ordinal)),
+            Arg.Any<string[]>(),
+            true,
+            AppConstants.MaxResultsPerPage,
+            500,
+            Arg.Any<TimeSpan>());
+    }
 }

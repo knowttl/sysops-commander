@@ -427,6 +427,58 @@ public partial class AdExplorerViewModel : ObservableObject, IRefreshable, IDisp
                 result = await _adService.SearchScopedAsync(
                     SearchText, baseDn, objectClasses, attribute, searchToken);
 
+                // Client-side DN filtering: AD doesn't support substring matching on distinguishedName,
+                // so the service searches by RDN components; filter results to those whose DN actually contains the term.
+                if (attribute == "distinguishedName")
+                {
+                    var dnFiltered = result.Results
+                        .Where(r => r.DistinguishedName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    result = new AdSearchResult
+                    {
+                        Results = dnFiltered,
+                        Query = result.Query,
+                        ExecutionTime = result.ExecutionTime,
+                        TotalResultCount = dnFiltered.Count,
+                        HasMoreResults = false
+                    };
+                }
+
+                // For "All attributes", also merge objects found by DN search
+                // (AD can't substring-match on distinguishedName via LDAP, so we run a separate DN search)
+                if (attribute is null)
+                {
+                    AdSearchResult dnResult = await _adService.SearchScopedAsync(
+                        SearchText, baseDn, objectClasses, "distinguishedName", searchToken);
+
+                    var dnMatches = dnResult.Results
+                        .Where(r => r.DistinguishedName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (dnMatches.Count > 0)
+                    {
+                        var existingDns = new HashSet<string>(
+                            result.Results.Select(r => r.DistinguishedName), StringComparer.OrdinalIgnoreCase);
+                        var newDnMatches = dnMatches
+                            .Where(r => !existingDns.Contains(r.DistinguishedName))
+                            .ToList();
+
+                        if (newDnMatches.Count > 0)
+                        {
+                            List<AdObject> merged = [.. result.Results, .. newDnMatches];
+                            result = new AdSearchResult
+                            {
+                                Results = merged,
+                                Query = result.Query,
+                                ExecutionTime = result.ExecutionTime,
+                                TotalResultCount = merged.Count,
+                                HasMoreResults = result.HasMoreResults
+                            };
+                        }
+                    }
+                }
+
                 // For "All attributes", also merge computers found by IP from the cache
                 if (attribute is null && _isIpCacheReady)
                 {

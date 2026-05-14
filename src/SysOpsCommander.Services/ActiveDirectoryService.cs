@@ -360,8 +360,18 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
 
         // Build attribute filter — skip wrapping with * if user already provided wildcards
         string wrap = hasWildcard ? string.Empty : "*";
+
+        // AD does not support LDAP substring matching on distinguishedName (it's a constructed attribute).
+        // Use a two-pass strategy: find objects by RDN + search within matching OUs/containers.
+        if (attribute is not null && attribute.Equals("distinguishedName", StringComparison.OrdinalIgnoreCase))
+        {
+            return await SearchByDistinguishedNameAsync(
+                sanitized, wrap, BuildObjectClassFilter(objectClasses),
+                baseDn ?? GetActiveDomain().RootDistinguishedName, searchTerm, cancellationToken).ConfigureAwait(false);
+        }
+
         string attrFilter = string.IsNullOrEmpty(attribute)
-            ? $"(|(sAMAccountName={wrap}{sanitized}{wrap})(cn={wrap}{sanitized}{wrap})(displayName={wrap}{sanitized}{wrap})(mail={wrap}{sanitized}{wrap})(dNSHostName={wrap}{sanitized}{wrap})(description={wrap}{sanitized}{wrap}))"
+            ? $"(|(sAMAccountName={wrap}{sanitized}{wrap})(cn={wrap}{sanitized}{wrap})(displayName={wrap}{sanitized}{wrap})(mail={wrap}{sanitized}{wrap})(dNSHostName={wrap}{sanitized}{wrap})(description={wrap}{sanitized}{wrap})(name={wrap}{sanitized}{wrap}))"
             : $"({attribute}={wrap}{sanitized}{wrap})";
 
         // Build object class filter
@@ -459,6 +469,79 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService, IDisposabl
         _domainSwitchLock.Dispose();
         _directoryAccessor.Dispose();
         _disposed = true;
+    }
+
+    /// <summary>
+    /// Two-pass search strategy for distinguishedName attribute:
+    /// 1. Find objects whose RDN (cn/ou/name) matches the term
+    /// 2. Find matching OUs/containers and search within their subtrees
+    /// </summary>
+    private async Task<AdSearchResult> SearchByDistinguishedNameAsync(
+        string sanitized,
+        string wrap,
+        string classFilter,
+        string baseDn,
+        string searchTerm,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        // Pass 1: Find objects whose RDN components match the search term
+        string rdnFilter = $"(|(cn={wrap}{sanitized}{wrap})(ou={wrap}{sanitized}{wrap})(name={wrap}{sanitized}{wrap}))";
+        string combinedRdnFilter = string.IsNullOrEmpty(classFilter)
+            ? rdnFilter
+            : $"(&{classFilter}{rdnFilter})";
+
+        AdSearchResult rdnResults = await ExecuteSearchAsync(
+            combinedRdnFilter, searchTerm, baseDn, cancellationToken).ConfigureAwait(false);
+
+        // Pass 2: Find OUs/containers matching the term to search within their subtrees
+        string ouFilter = $"(&(|(objectClass=organizationalUnit)(objectClass=container))(|(ou={wrap}{sanitized}{wrap})(name={wrap}{sanitized}{wrap})(cn={wrap}{sanitized}{wrap})))";
+        AdSearchResult ouResults = await ExecuteSearchAsync(
+            ouFilter, searchTerm, baseDn, cancellationToken).ConfigureAwait(false);
+
+        var allResults = new List<AdObject>(rdnResults.Results);
+        var existingDns = new HashSet<string>(
+            rdnResults.Results.Select(r => r.DistinguishedName), StringComparer.OrdinalIgnoreCase);
+
+        // Search within each matching OU/container (cap at 5 to limit LDAP round-trips)
+        const int maxOuSubtreeSearches = 5;
+        int ouSearchCount = 0;
+
+        foreach (AdObject ou in ouResults.Results)
+        {
+            if (ouSearchCount >= maxOuSubtreeSearches)
+            {
+                break;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string subtreeFilter = string.IsNullOrEmpty(classFilter) ? "(objectClass=*)" : classFilter;
+            AdSearchResult subtreeResults = await ExecuteSearchAsync(
+                subtreeFilter, searchTerm, ou.DistinguishedName, cancellationToken).ConfigureAwait(false);
+
+            foreach (AdObject obj in subtreeResults.Results)
+            {
+                if (existingDns.Add(obj.DistinguishedName))
+                {
+                    allResults.Add(obj);
+                }
+            }
+
+            ouSearchCount++;
+        }
+
+        stopwatch.Stop();
+
+        return new AdSearchResult
+        {
+            Results = allResults,
+            Query = searchTerm,
+            ExecutionTime = stopwatch.Elapsed,
+            TotalResultCount = allResults.Count,
+            HasMoreResults = allResults.Count >= AppConstants.MaxResultsPerPage
+        };
     }
 
     private async Task<AdSearchResult> ExecuteSearchAsync(
